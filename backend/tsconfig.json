@@ -2,21 +2,11 @@
   "compilerOptions": {
     "target": "ES2022",
     "lib": ["ES2022"],
-    // node16, not the legacy node10 algorithm, which TypeScript has deprecated
-    // and drops in 7.0. With no "type" field in package.json this still emits
-    // CommonJS, but resolution now honours dependencies' "exports" maps —
-    // which is how @solarx/shared is consumed.
+   
     "module": "node16",
     "moduleResolution": "node16",
     "outDir": "dist",
-    // src, not "." — with the project root as rootDir the build emits
-    // dist/src/server.js while package.json points at dist/server.js.
-    // prisma.config.ts and scripts/ are type-checked separately via
-    // tsconfig.tools.json; neither belongs in the build output.
     "rootDir": "src",
-    // Vitest transforms each file independently via esbuild, so constructs
-    // that need whole-program knowledge cannot be compiled. This rejects them
-    // at typecheck time rather than at test time.
     "isolatedModules": true,
     "strict": true,
     "noUncheckedIndexedAccess": true,
