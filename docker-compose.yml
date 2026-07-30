@@ -1,0 +1,102 @@
+# Local development database, plus a browser UI for inspecting it.
+#
+# Ports avoid the defaults on purpose: this machine already runs a database
+# container per project, and staying off 5432 also avoids colliding with any
+# Postgres installed directly on the host.
+#
+#   Postgres   localhost:5433   databases: homematch (dev), homematch_test (tests)
+#   Adminer    http://localhost:7071/?pgsql=postgres&username=homematch&db=homematch
+#              (the ?pgsql= part preselects PostgreSQL — without it Adminer
+#              opens on MySQL and refuses the connection)
+#              user: homematch  password: homematch_dev_password  database: homematch
+#
+#   docker compose up -d      start
+#   docker compose down       stop, keeping data
+#   docker compose down -v    stop and delete the volume
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: homematch-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: homematch
+      POSTGRES_PASSWORD: homematch_dev_password
+      POSTGRES_DB: homematch
+    ports:
+      - "5433:5432"
+    volumes:
+      - homematch-postgres-data:/var/lib/postgresql/data
+      # Creates the `homematch_test` database alongside `homematch`. Scripts here run
+      # only when the data directory is empty, i.e. on a brand-new volume.
+      - ./docker/postgres-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      # `prisma migrate` fails confusingly against a container that is up but
+      # not yet accepting connections, so the readiness check matters here.
+      test: ["CMD-SHELL", "pg_isready -U homematch -d homematch"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Database UI. Development only — it is unauthenticated beyond the Postgres
+  # credentials themselves, so it must never be exposed beyond localhost.
+  adminer:
+    image: adminer:5
+    container_name: homematch-adminer
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # The only ADMINER_* variable this image actually reads. It preselects
+      # the host; the driver has to come from the URL (see the ?pgsql= link
+      # above) or be chosen in the System dropdown, otherwise Adminer defaults
+      # to MySQL and the connection is refused.
+      ADMINER_DEFAULT_SERVER: postgres
+    ports:
+      # Bound to the loopback interface explicitly: with a bare "7071:8080"
+      # Docker would publish this on every interface, putting a database
+      # console on the local network.
+      - "127.0.0.1:7071:8080"
+
+  # S3-compatible object storage for uploaded files (inspection photos; later,
+  # generated PDFs). The backend talks to it exactly as it will talk to AWS S3
+  # or Cloudflare R2 in production — only the endpoint and credentials change.
+  #
+  #   S3 API    localhost:9000
+  #   Console   http://localhost:9001   (user: homematch  password: homematch_dev_password)
+  minio:
+    image: minio/minio:latest
+    container_name: homematch-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: homematch
+      MINIO_ROOT_PASSWORD: homematch_dev_password
+    ports:
+      # Loopback only, for the same reason as Adminer above.
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
+    volumes:
+      - homematch-minio-data:/data
+
+  # One-shot: create the dev and test buckets, then exit. Retries until MinIO is
+  # accepting connections, so it needs no healthcheck on the server container.
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      - minio
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        until mc alias set local http://minio:9000 homematch homematch_dev_password; do
+          echo 'waiting for minio...'; sleep 1;
+        done
+        mc mb --ignore-existing local/homematch-dev
+        mc mb --ignore-existing local/homematch-test
+        echo 'buckets ready'
+
+volumes:
+  homematch-postgres-data:
+  homematch-minio-data:
