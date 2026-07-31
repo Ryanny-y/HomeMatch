@@ -1,4 +1,3 @@
-import type { CSSProperties } from "react";
 import type { IconType } from "react-icons";
 import {
   PiCalculator,
@@ -8,6 +7,7 @@ import {
   PiSlidersHorizontal,
 } from "react-icons/pi";
 
+import { Reveal, RevealGroup, RevealItem } from "@/components/motion/Reveal";
 import { ButtonLink } from "@/components/ui/Button";
 import { Card, IconBadge } from "@/components/ui/Card";
 import { Eyebrow, Section, SectionHeading } from "@/components/ui/Section";
@@ -19,29 +19,25 @@ import { SIGNUP_RENTER } from "@/lib/site";
  * It is marked up as an ordered list for that reason.
  */
 
-const STEPS: readonly { label: string; body: string; icon: IconType; tint: string }[] = [
+const STEPS: readonly { label: string; body: string; icon: IconType }[] = [
   {
     label: "Tell us what you need",
     icon: PiSlidersHorizontal,
-    tint: "bg-blue-50 text-blue-600",
     body: "Your budget, where you work or study, how you get there, and the things you won't compromise on — pets, parking, household size.",
   },
   {
     label: "Browse what fits",
     icon: PiMagnifyingGlass,
-    tint: "bg-violet-50 text-violet-600",
     body: "Every listing arrives already scored against that profile, with the reasons for the score written out in plain language.",
   },
   {
     label: "See what it really costs",
     icon: PiCalculator,
-    tint: "bg-amber-50 text-amber-600",
     body: "Rent, parking, utilities, internet, dues, and amortised move-in cost, itemised into one honest monthly figure.",
   },
   {
     label: "Compare and decide",
     icon: PiScales,
-    tint: "bg-cyan-50 text-cyan-600",
     body: "Put your shortlist side by side, read the trade-offs, and pick the one you can defend to yourself six months from now.",
   },
 ];
@@ -49,21 +45,21 @@ const STEPS: readonly { label: string; body: string; icon: IconType; tint: strin
 export function HowItWorks() {
   return (
     <Section id="how-it-works" labelledBy="how-it-works-heading">
-      <div className="rise max-w-3xl">
+      <Reveal className="max-w-3xl">
         <Eyebrow icon={PiListChecks}>How it works</Eyebrow>
         <SectionHeading id="how-it-works-heading">
           Four steps between you and a decision you trust.
         </SectionHeading>
-      </div>
+      </Reveal>
 
       {/* The one grid where a stagger carries information rather than sparkle:
           these four things happen in this order, so they arrive in it. */}
-      <ol className="stagger mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+      <RevealGroup as="ol" className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
         {STEPS.map((step, index) => (
-          <li key={step.label} style={{ "--i": index } as CSSProperties}>
+          <RevealItem key={step.label} index={index}>
             <Card className="h-full p-6">
               <div className="flex items-center justify-between">
-                <IconBadge icon={step.icon} className={step.tint} />
+                <IconBadge icon={step.icon} tone="onSurface" />
                 <span
                   data-figure=""
                   className="text-2xl font-extrabold tracking-[-0.04em] text-line-strong"
@@ -78,9 +74,9 @@ export function HowItWorks() {
                 {step.body}
               </p>
             </Card>
-          </li>
+          </RevealItem>
         ))}
-      </ol>
+      </RevealGroup>
 
       <div className="mt-10">
         <ButtonLink href={SIGNUP_RENTER} size="lg">

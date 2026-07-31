@@ -1,5 +1,6 @@
 import { PiCheckCircleFill, PiSparkle, PiXCircleFill } from "react-icons/pi";
 
+import { Reveal } from "@/components/motion/Reveal";
 import { Eyebrow, Lede, Section, SectionHeading } from "@/components/ui/Section";
 
 /**
@@ -10,7 +11,7 @@ import { Eyebrow, Lede, Section, SectionHeading } from "@/components/ui/Section"
 export function Solution() {
   return (
     <Section id="solution" tone="deep" labelledBy="solution-heading">
-      <div className="rise max-w-3xl">
+      <Reveal className="max-w-3xl">
         <Eyebrow icon={PiSparkle} onDark>
           The difference
         </Eyebrow>
@@ -18,7 +19,7 @@ export function Solution() {
           Two platforms can show the same apartment and still be answering
           completely different questions.
         </SectionHeading>
-      </div>
+      </Reveal>
 
       <div className="mt-12 grid gap-5 lg:grid-cols-2">
         <div className="rounded-card border border-white/15 p-7">

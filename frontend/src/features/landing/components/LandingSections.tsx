@@ -1,3 +1,4 @@
+import { MotionRoot } from "@/components/motion/MotionRoot";
 import { StructuredData } from "@/components/StructuredData";
 import { Comparison } from "@/features/landing/components/Comparison";
 import { Coverage } from "@/features/landing/components/Coverage";
@@ -19,6 +20,12 @@ import { landingJsonLd } from "@/features/landing/structured-data";
  * The structured data ships from here rather than from the route, because it
  * describes this content — keeping them together means adding an FAQ entry
  * cannot silently desynchronise the FAQPage schema from what the page renders.
+ *
+ * `MotionRoot` is scoped to this surface rather than to the root layout: the
+ * scroll entrances only exist here, so the auth screens ship none of Motion.
+ * Every section below stays a Server Component — they are passed through as
+ * children, so the client boundary is the provider and the small reveal
+ * wrappers, not the page.
  */
 export function LandingSections() {
   return (
@@ -27,20 +34,22 @@ export function LandingSections() {
         <StructuredData key={String(schema["@id"])} data={schema} />
       ))}
 
-      <main id="main" className="flex-1">
-        <Hero />
-        <Problem />
-        <Solution />
-        <MatchScore />
-        <TrueCost />
-        <Comparison />
-        <SupportingFeatures />
-        <HowItWorks />
-        <ForLandlords />
-        <Coverage />
-        <Faq />
-        <FinalCta />
-      </main>
+      <MotionRoot>
+        <main id="main" className="flex-1">
+          <Hero />
+          <Problem />
+          <Solution />
+          <MatchScore />
+          <TrueCost />
+          <Comparison />
+          <SupportingFeatures />
+          <HowItWorks />
+          <ForLandlords />
+          <Coverage />
+          <Faq />
+          <FinalCta />
+        </main>
+      </MotionRoot>
     </>
   );
 }

@@ -1,6 +1,7 @@
 import Image from "next/image";
 import { PiMapPinLine, PiShieldCheck } from "react-icons/pi";
 
+import { Reveal } from "@/components/motion/Reveal";
 import { Card, IconBadge } from "@/components/ui/Card";
 import { Eyebrow, Lede, Section, SectionHeading } from "@/components/ui/Section";
 
@@ -14,7 +15,7 @@ export function Coverage() {
   return (
     <Section id="coverage" labelledBy="coverage-heading">
       <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
-        <div className="rise">
+        <Reveal>
           <Eyebrow icon={PiMapPinLine}>Where we are</Eyebrow>
           <SectionHeading id="coverage-heading">
             Quezon City first, and only what we can verify.
@@ -34,11 +35,7 @@ export function Coverage() {
 
           <div className="mt-8 grid gap-4 sm:grid-cols-2">
             <Card className="flex items-center gap-3.5 p-4">
-              <IconBadge
-                icon={PiMapPinLine}
-                className="bg-blue-50 text-blue-600"
-                size="sm"
-              />
+              <IconBadge icon={PiMapPinLine} tone="onSurface" size="sm" />
               <div>
                 <p className="font-mono text-[0.625rem] font-medium tracking-[0.08em] uppercase text-ink-muted">
                   Live coverage
@@ -48,11 +45,7 @@ export function Coverage() {
             </Card>
 
             <Card className="flex items-center gap-3.5 p-4">
-              <IconBadge
-                icon={PiShieldCheck}
-                className="bg-amber-50 text-amber-600"
-                size="sm"
-              />
+              <IconBadge icon={PiShieldCheck} tone="onSurface" size="sm" />
               <div>
                 <p className="font-mono text-[0.625rem] font-medium tracking-[0.08em] uppercase text-ink-muted">
                   Listing source
@@ -61,17 +54,19 @@ export function Coverage() {
               </div>
             </Card>
           </div>
-        </div>
+        </Reveal>
 
-        <Card className="rise overflow-hidden p-2">
-          <Image
-            src="/coverage-quezon-city.svg"
-            alt="Diagram of HomeMatch AI's coverage area. Quezon City is outlined as live, with Trinoma, UP Diliman, Katipunan and Ateneo, Cubao, and Eastwood marked inside it. A dashed boundary around the rest of Metro Manila is labelled as planned expansion."
-            width={640}
-            height={460}
-            className="h-auto w-full rounded-[0.625rem]"
-          />
-        </Card>
+        <Reveal>
+          <Card className="overflow-hidden p-2">
+            <Image
+              src="/coverage-quezon-city.svg"
+              alt="Diagram of HomeMatch AI's coverage area. Quezon City is outlined as live, with Trinoma, UP Diliman, Katipunan and Ateneo, Cubao, and Eastwood marked inside it. A dashed boundary around the rest of Metro Manila is labelled as planned expansion."
+              width={640}
+              height={460}
+              className="h-auto w-full rounded-[0.625rem]"
+            />
+          </Card>
+        </Reveal>
       </div>
     </Section>
   );

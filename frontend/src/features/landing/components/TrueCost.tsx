@@ -1,5 +1,6 @@
 import { PiCalculator } from "react-icons/pi";
 
+import { Reveal } from "@/components/motion/Reveal";
 import { COST_CATEGORY } from "@/components/product/cost-category";
 import {
   CompositionBar,
@@ -18,8 +19,9 @@ export function TrueCost() {
   return (
     <Section id="true-cost" tone="surface" labelledBy="true-cost-heading">
       <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
-        {/* No `rise` on this card. It carries the focal sequence, and a fade-up
-            underneath a bar that is already drawing itself just muddies both. */}
+        {/* No `<Reveal>` on this card. It carries the focal sequence, and a
+            fade-up underneath a bar that is already drawing itself muddies
+            both. The pieces inside it stage themselves. */}
         <Card tone="sunken" className="order-2 p-6 sm:p-8 lg:order-1">
           <p className="font-mono text-[0.6875rem] font-medium tracking-[0.08em] uppercase text-ink-muted">
             {SAMPLE_UNIT.barangay} · {SAMPLE_UNIT.unitType}
@@ -80,7 +82,7 @@ export function TrueCost() {
           </StatementFootnote>
         </Card>
 
-        <div className="rise order-1 lg:order-2">
+        <Reveal className="order-1 lg:order-2">
           <Eyebrow icon={PiCalculator}>True monthly cost</Eyebrow>
           <SectionHeading id="true-cost-heading">
             Rent is not the price.
@@ -112,7 +114,7 @@ export function TrueCost() {
               and most renters only find it after they&rsquo;ve signed.
             </p>
           </Card>
-        </div>
+        </Reveal>
       </div>
     </Section>
   );

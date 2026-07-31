@@ -1,5 +1,6 @@
 import { PiSparkle } from "react-icons/pi";
 
+import { Reveal } from "@/components/motion/Reveal";
 import { CriteriaList } from "@/components/product/CriteriaList";
 import { ScoreRing } from "@/components/product/ScoreRing";
 import { Card, Pill } from "@/components/ui/Card";
@@ -10,7 +11,7 @@ export function MatchScore() {
   return (
     <Section id="match-score" labelledBy="match-score-heading">
       <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
-        <div className="rise">
+        <Reveal>
           <Eyebrow icon={PiSparkle}>AI match score</Eyebrow>
           <SectionHeading id="match-score-heading">
             A score out of 100, and the reasons behind every point of it.
@@ -33,7 +34,7 @@ export function MatchScore() {
               can&rsquo;t see.
             </p>
           </blockquote>
-        </div>
+        </Reveal>
 
         {/* The ring sweeps on its own as this scrolls in, so the card does not
             also need the section entrance underneath it. */}

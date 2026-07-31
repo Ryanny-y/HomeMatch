@@ -1,16 +1,52 @@
 /**
- * The one place that owns time-based animation in JavaScript.
+ * The one place that owns motion timing in JavaScript.
  *
- * Almost all motion on this site is CSS, because CSS runs whether or not the
- * bundle arrives. The exception is a figure that has to count — CSS cannot
- * animate a number and keep it in the accessibility tree at the same time — so
- * this module exists for that and nothing else.
+ * State, hover, press, and disclosure are still CSS, because CSS runs whether
+ * or not the bundle arrives and none of those need a scroll position. Two
+ * things do need JavaScript: a figure that has to count — CSS cannot animate a
+ * number and keep it in the accessibility tree at the same time — and the
+ * scroll entrances, which moved to Motion because `animation-timeline: view()`
+ * still does not exist in Firefox. See `components/motion/Reveal.tsx`.
  *
- * The durations agree with the `--dur-*` tokens in `globals.css` by hand. A
- * count is driven by `requestAnimationFrame` rather than by a CSS timeline, so
- * it cannot read the token; keeping the two in sync is a maintenance cost paid
- * deliberately, in one file, rather than scattered across components.
+ * Everything here agrees with the `--dur-*` and `--ease-*` tokens in
+ * `globals.css` by hand. Neither a frame loop nor Motion can read a CSS custom
+ * property, so keeping the two in sync is a maintenance cost paid deliberately,
+ * in one file, rather than scattered across components.
  */
+
+import type { Transition } from "motion/react";
+
+/** `--ease-arrival`. Things land and stay landed. */
+export const EASE_ARRIVAL = [0.16, 1, 0.3, 1] as const;
+
+/** The quiet entrance, matching the old `rise-in` keyframes exactly. */
+export const RISE: Transition = { duration: 0.42, ease: EASE_ARRIVAL };
+
+/** `--dur-focal`. The one authored moment, and nothing else. */
+export const FOCAL: Transition = { duration: 0.7, ease: EASE_ARRIVAL };
+
+/**
+ * How far up from the bottom edge an element must travel before it counts as
+ * arrived. Matches the `rootMargin` in `useCountUp`, so a cost card's bar,
+ * figure, and callout all start from the same scroll position and keep the
+ * order the sequence was authored in.
+ */
+export const REVEAL_MARGIN = "0px 0px -15% 0px";
+
+/** The same threshold as a fraction, for measuring an element directly. */
+export const REVEAL_TRIGGER = 0.85;
+
+/** Sibling stagger: 60ms apart, and never more than four steps of it. */
+export const STAGGER_STEP = 0.06;
+export const STAGGER_CAP = 3;
+
+/**
+ * When the gap callout lands, in seconds — a beat after the total has stopped
+ * counting. Holding it back is the whole point: shown at the same moment as the
+ * number, it reads as part of the card's furniture rather than as the
+ * conclusion the card was building to.
+ */
+export const GAP_DELAY = 0.9;
 
 /** How long a figure takes to travel from its opening value to its real one. */
 export const COUNT_DURATION = 700;

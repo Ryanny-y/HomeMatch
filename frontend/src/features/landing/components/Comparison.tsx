@@ -1,5 +1,6 @@
 import { PiScales, PiSparkleFill } from "react-icons/pi";
 
+import { Reveal } from "@/components/motion/Reveal";
 import { CriteriaList } from "@/components/product/CriteriaList";
 import { Card, Pill } from "@/components/ui/Card";
 import { Eyebrow, Lede, Section, SectionHeading } from "@/components/ui/Section";
@@ -12,7 +13,7 @@ export function Comparison() {
 
   return (
     <Section id="comparison" labelledBy="comparison-heading">
-      <div className="rise max-w-3xl">
+      <Reveal className="max-w-3xl">
         <Eyebrow icon={PiScales}>AI comparison</Eyebrow>
         <SectionHeading id="comparison-heading">
           Shortlisting is easy. Choosing is the hard part.
@@ -23,7 +24,7 @@ export function Comparison() {
           one actually costs you — in pesos, in minutes, and in the things you
           give up.
         </Lede>
-      </div>
+      </Reveal>
 
       <div className="mt-12 grid gap-5 lg:grid-cols-2">
         {SAMPLE_COMPARISON.map((unit) => {
@@ -65,7 +66,8 @@ export function Comparison() {
         })}
       </div>
 
-      <Card tone="brand" className="rise mt-5 p-6 sm:p-8">
+      <Reveal className="mt-5">
+        <Card tone="brand" className="p-6 sm:p-8">
         <p className="flex items-center gap-2 font-mono text-[0.6875rem] font-medium tracking-[0.08em] uppercase text-brand-dark">
           <PiSparkleFill aria-hidden="true" className="h-4 w-4" />
           Trade-off summary
@@ -81,7 +83,8 @@ export function Comparison() {
           Written by the AI from both listings&rsquo; stored fields. It cannot
           cite anything that isn&rsquo;t recorded on the unit.
         </p>
-      </Card>
+        </Card>
+      </Reveal>
     </Section>
   );
 }

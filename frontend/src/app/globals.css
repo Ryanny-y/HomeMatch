@@ -5,9 +5,31 @@
 
    Palette follows the Real Estate/Property recommendation from the UI/UX
    database: trust blue primary, gold accent, near-white ground, white cards.
-   The extra hues are not decoration — each one is bound to a cost category, so
-   the same colour always means the same line item whether it appears as a chip
-   in the itemised list or as a segment in the composition bar.
+
+   THE COLOUR CONTRACT — four roles. Anything that is not one of them is
+   neutral ink, and that is not an oversight.
+
+     1. BRAND BLUE   action and navigation. Buttons, links, focus rings.
+     2. THE SIX CAT  identify a cost line. `CompositionBar` and `StatementRow`,
+        HUES         and nowhere else on the page.
+     3. GOLD         the match score, and the honest half of an answer — the
+                     tradeoffs in `CriteriaList`.
+     4. DANGER       the gap between advertised rent and true cost. Once.
+
+   Rule 2 is the one that costs discipline. This product's whole claim is that
+   its numbers can be checked, and the six hues are how a number says which
+   number it is — the violet segment in the bar and the violet dot beside
+   "Parking" are one fact drawn twice. A violet icon on a marketing card two
+   sections earlier spends that meaning before it is made. So the six hues are
+   never decoration, and a decorative `bg-violet-50` is a bug even though it
+   compiles.
+
+   This is enforced by hand, so it is worth knowing how it broke last time:
+   nineteen icon chips carried raw Tailwind hues (`bg-amber-50 text-amber-600`)
+   that *looked* bound to these tokens and were not. Tailwind 4 moved its
+   defaults to OKLCH, so `amber-600` is #DD7400 against a --color-cat-utilities
+   of #F59E0B — amber against burnt orange, on one page. Reach for a `--color-*`
+   token, never a numbered Tailwind hue.
 
    Amber is fill-only. #F59E0B on white is 2.1:1, so anywhere amber has to be
    read as text it uses --color-gold-ink (#B45309, 4.95:1) instead.
@@ -148,7 +170,7 @@
 
    Declared with `@utility` rather than as plain classes in `@layer components`,
    so Tailwind treats them as first-class utilities: they sort correctly against
-   the rest of the output and compose with variants (`md:rise`, `group-hover:lift`)
+   the rest of the output and compose with variants (`md:lift`, `group-hover:lift`)
    instead of being inert class names that happen to exist.
 
    ---------------------------------------------------------------------------
@@ -166,12 +188,22 @@
    disclosure exist to acknowledge an action or explain a state change, never to
    decorate. Nothing animates width, height, or position; nothing loops.
 
-   Two triggers, and the distinction matters:
-     `-load`  time-based, for anything already on screen at first paint.
-     `-view`  scroll-driven via `animation-timeline: view()`, so no JavaScript
-              is involved. Where the timeline is unsupported the animation runs
-              once at load and lands on the same final state, so content is
-              never trapped in a hidden keyframe.
+   WHAT LIVES HERE, AND WHAT DOES NOT.
+
+   This file owns everything that does not need to know a scroll position:
+   hover, press, disclosure, the skip link, the mobile nav panel, and the `-load`
+   entrances that play on the hero because it is on screen at first paint. All
+   of it runs without JavaScript, which is the reason to keep it in CSS.
+
+   The scroll entrances used to live here too, driven by `animation-timeline:
+   view()`. They now live in `components/motion/Reveal.tsx`, because that
+   timeline is still unimplemented in Firefox and only shipped in Safari 26 —
+   and the fallback was not "no animation", it was every section animating at
+   once on load, which meant a reader four screens down had already missed all
+   of it. `rise`, `stagger`, `wipe-view`, and `land-late-view` were deleted with
+   that move; the `-load` twins below are the survivors, and they are still CSS
+   on purpose. See the header of `Reveal.tsx` for how the JavaScript version
+   avoids ever hiding content it cannot then reveal.
 --------------------------------------------------------------------------- */
 
 @keyframes rise-in {
@@ -223,31 +255,6 @@
   }
 }
 
-/* The quiet entrance for prose blocks. Deliberately shorter and shallower than
-   the focal sequence: a section heading arriving is not an event. */
-@utility rise {
-  @media (prefers-reduced-motion: no-preference) {
-    animation: rise-in 420ms var(--ease-arrival) both;
-    animation-timeline: view();
-    animation-range: entry 0% cover 22%;
-  }
-}
-
-/* Sibling stagger for grids that genuinely read as a list. Progress-based
-   timelines ignore `animation-delay`, so the offset is expressed as a shifted
-   `animation-range` instead — each child starts a little further into the
-   scroll. Children carry `--i`; callers cap it so a six-up grid never trails.  */
-@utility stagger {
-  @media (prefers-reduced-motion: no-preference) {
-    & > * {
-      animation: rise-in 420ms var(--ease-arrival) both;
-      animation-timeline: view();
-      animation-range: entry calc(var(--i, 0) * 5%) cover
-        calc(22% + var(--i, 0) * 5%);
-    }
-  }
-}
-
 @utility lift {
   @media (prefers-reduced-motion: no-preference) {
     transition:
@@ -284,28 +291,13 @@
   }
 }
 
-@utility wipe-view {
-  @media (prefers-reduced-motion: no-preference) {
-    animation: wipe-x var(--dur-focal) var(--ease-arrival) both;
-    animation-timeline: view();
-    animation-range: entry 0% cover 28%;
-  }
-}
-
 /* The gap callout is the payload, so it waits for the total to finish counting
    and then arrives on its own. Holding it back is the whole point: shown at the
-   same time as the number, it would read as part of the card's furniture. */
+   same time as the number, it would read as part of the card's furniture. The
+   scrolled copy of this card expresses the same 900ms as `GAP_DELAY`. */
 @utility land-late-load {
   @media (prefers-reduced-motion: no-preference) {
     animation: rise-in 420ms var(--ease-arrival) 900ms both;
-  }
-}
-
-@utility land-late-view {
-  @media (prefers-reduced-motion: no-preference) {
-    animation: rise-in 420ms var(--ease-arrival) both;
-    animation-timeline: view();
-    animation-range: entry 14% cover 36%;
   }
 }
 

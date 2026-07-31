@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { PiCaretRight, PiPlus, PiQuestion } from "react-icons/pi";
 
+import { Reveal } from "@/components/motion/Reveal";
 import { Card } from "@/components/ui/Card";
 import { Eyebrow, Section, SectionHeading } from "@/components/ui/Section";
 import { FAQ } from "@/features/landing/faq";
@@ -14,12 +15,12 @@ export function Faq() {
   return (
     <Section id="faq" tone="surface" labelledBy="faq-heading">
       <div className="grid gap-10 lg:grid-cols-[minmax(0,0.75fr)_minmax(0,1.25fr)] lg:gap-16">
-        <div className="rise">
+        <Reveal>
           <Eyebrow icon={PiQuestion}>Questions</Eyebrow>
           <SectionHeading id="faq-heading">
             The things worth asking before you sign up.
           </SectionHeading>
-        </div>
+        </Reveal>
 
         <div className="space-y-3">
           {FAQ.map((entry) => (

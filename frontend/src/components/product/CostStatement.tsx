@@ -1,10 +1,13 @@
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { PiWarningCircleFill } from "react-icons/pi";
 
+import { Reveal } from "@/components/motion/Reveal";
+import { Wipe } from "@/components/motion/Wipe";
 import { COST_CATEGORY } from "@/components/product/cost-category";
 import { CountUpFigure } from "@/components/product/CountUpFigure";
 import type { CountTrigger } from "@/hooks/useCountUp";
 import { peso } from "@/lib/format";
+import { GAP_DELAY } from "@/lib/motion";
 import type { CostLine } from "@/lib/sample-listing";
 
 /**
@@ -55,6 +58,8 @@ export function Statement({
   );
 }
 
+const BAR = "flex h-3 w-full gap-0.5 overflow-hidden rounded-full";
+
 export function CompositionBar({
   lines,
   total,
@@ -64,18 +69,27 @@ export function CompositionBar({
   total: number;
   reveal?: StatementReveal;
 }) {
-  const wipe = { load: "wipe-load", view: "wipe-view", none: "" }[reveal];
+  const segments = lines.map((line) => (
+    <span
+      key={line.category}
+      data-seg={line.category}
+      // A segment's width is its share of the total, which is only known at
+      // runtime — so the value rides in on a custom property and `w-(--…)`
+      // stays the declaration, as Tailwind prescribes for dynamic values.
+      className={`w-(--share) ${COST_CATEGORY[line.category].fill} first:rounded-l-full last:rounded-r-full`}
+      style={{ "--share": `${percentOf(line.amount, total)}%` } as CSSProperties}
+    />
+  ));
+
+  // The scroll-triggered copy needs a real observer; the one that plays on load
+  // is already on screen and stays on CSS, so it runs without a bundle.
+  if (reveal === "view") {
+    return <Wipe className={BAR}>{segments}</Wipe>;
+  }
 
   return (
-    <div className={`flex h-3 w-full gap-0.5 overflow-hidden rounded-full ${wipe}`}>
-      {lines.map((line) => (
-        <span
-          key={line.category}
-          data-seg={line.category}
-          className={`${COST_CATEGORY[line.category].fill} first:rounded-l-full last:rounded-r-full`}
-          style={{ width: `${percentOf(line.amount, total)}%` }}
-        />
-      ))}
+    <div className={`${BAR} ${reveal === "load" ? "wipe-load" : ""}`}>
+      {segments}
     </div>
   );
 }
@@ -188,15 +202,12 @@ export function StatementGap({
 }) {
   const difference = trueCost - advertised;
   const percent = Math.round((difference / advertised) * 100);
-  const land = {
-    load: "land-late-load",
-    view: "land-late-view",
-    none: "",
-  }[reveal];
 
-  return (
+  const callout = (
     <p
-      className={`mt-3 flex items-start gap-2.5 rounded-chip border border-danger-line bg-danger-soft px-3.5 py-3 text-[0.875rem] leading-snug text-ink ${land}`}
+      className={`mt-3 flex items-start gap-2.5 rounded-chip border border-danger-line bg-danger-soft px-3.5 py-3 text-[0.875rem] leading-snug text-ink ${
+        reveal === "load" ? "land-late-load" : ""
+      }`}
     >
       <PiWarningCircleFill
         aria-hidden="true"
@@ -209,6 +220,12 @@ export function StatementGap({
         than the advertised rent — {percent}% above the number in the listing.
       </span>
     </p>
+  );
+
+  return reveal === "view" ? (
+    <Reveal delay={GAP_DELAY}>{callout}</Reveal>
+  ) : (
+    callout
   );
 }
 

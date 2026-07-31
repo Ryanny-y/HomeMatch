@@ -7,6 +7,29 @@ import { ImageResponse } from "next/og";
  *
  * The composition bar uses the same category colours as the site, so the card
  * and the page are recognisably the same product.
+ *
+ * ---
+ *
+ * A NOTE ON THE `tw` PROP — read before editing.
+ *
+ * This is the one file in the app whose classes are NOT our Tailwind. Satori
+ * (which renders this to PNG) ships its own miniature Tailwind and reads it
+ * from `tw`, not `className`. Two consequences that will bite:
+ *
+ * 1. It cannot see `@theme` in `globals.css`, so there is no `bg-canvas` or
+ *    `text-ink` here. Colours are literal, interpolated from the constants
+ *    below so the palette still has one source.
+ * 2. Nothing in this file is scanned by the Tailwind compiler, so the usual
+ *    ban on building class names by interpolation does not apply — `tw` is
+ *    parsed at render time, from the finished string.
+ *
+ * It also implements a subset. If a utility silently does nothing, express
+ * that one declaration through `style` instead (`style` wins over `tw`), and
+ * say why in a comment. Two are already known to be missing, both verified by
+ * rendering the card and diffing the PNG: `gap-*` is ignored outright, and
+ * `flex-[1.05]` pushes the card off the canvas entirely. Every `gap` and
+ * `flex` below is therefore set through `style`, and moving either back to
+ * `tw` breaks the image silently — no error, just a wrong card.
  */
 
 export const runtime = "nodejs";
@@ -43,26 +66,12 @@ function Line({
 }) {
   return (
     <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 12,
-        borderBottom: `1px solid ${LINE}`,
-        paddingBottom: 14,
-        marginBottom: 14,
-        fontSize: 26,
-      }}
+      tw={`flex items-center mb-3.5 border-b border-[${LINE}] pb-3.5 text-[26px]`}
+      style={{ gap: 12 }}
     >
-      <div
-        style={{
-          width: 12,
-          height: 12,
-          borderRadius: 999,
-          backgroundColor: color,
-        }}
-      />
-      <div style={{ display: "flex", flex: 1, color: MUTED }}>{label}</div>
-      <div style={{ display: "flex", color: INK, fontWeight: 600 }}>{amount}</div>
+      <div tw={`h-3 w-3 rounded-full bg-[${color}]`} />
+      <div tw={`flex flex-1 text-[${MUTED}]`}>{label}</div>
+      <div tw={`flex font-semibold text-[${INK}]`}>{amount}</div>
     </div>
   );
 }
@@ -71,132 +80,71 @@ export default function OpengraphImage() {
   return new ImageResponse(
     (
       <div
-        style={{
-          width: "100%",
-          height: "100%",
-          display: "flex",
-          backgroundColor: CANVAS,
-          color: INK,
-          padding: 72,
-          gap: 56,
-        }}
+        tw={`flex h-full w-full bg-[${CANVAS}] p-[72px] text-[${INK}]`}
+        style={{ gap: 56 }}
       >
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            justifyContent: "space-between",
-            flex: 1.05,
-          }}
-        >
-          <div style={{ display: "flex", flexDirection: "column" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-              <div
-                style={{
-                  display: "flex",
-                  width: 44,
-                  height: 44,
-                  borderRadius: 12,
-                  backgroundColor: BRAND,
-                }}
-              />
-              <div style={{ display: "flex", fontSize: 28, fontWeight: 700 }}>
-                HomeMatch AI
-              </div>
+        {/* The two columns are 1.05 / 0.95 rather than even: the headline wants
+            the extra line-length, and the card is denser than it looks. */}
+        <div tw="flex flex-col justify-between" style={{ flex: 1.05 }}>
+          <div tw="flex flex-col">
+            <div tw="flex items-center" style={{ gap: 14 }}>
+              <div tw={`h-11 w-11 rounded-xl bg-[${BRAND}]`} />
+              <div tw="flex text-[28px] font-bold">HomeMatch AI</div>
             </div>
 
-            <div
-              style={{
-                display: "flex",
-                fontSize: 70,
-                fontWeight: 800,
-                lineHeight: 1.05,
-                letterSpacing: -2.5,
-                marginTop: 40,
-              }}
-            >
+            <div tw="flex mt-10 text-[70px] font-extrabold leading-[1.05] tracking-[-2.5px]">
               Find the right home, not just another listing.
             </div>
           </div>
 
-          <div style={{ display: "flex", fontSize: 25, color: MUTED, lineHeight: 1.4 }}>
+          <div tw={`flex text-[25px] leading-[1.4] text-[${MUTED}]`}>
             Match scores, true monthly cost, and side-by-side comparisons for
             Quezon City.
           </div>
         </div>
 
         <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            flex: 0.95,
-            backgroundColor: SURFACE,
-            border: `1px solid ${LINE}`,
-            borderRadius: 18,
-            padding: 40,
-            justifyContent: "center",
-          }}
+          tw={`flex flex-col justify-center rounded-[18px] border border-[${LINE}] bg-[${SURFACE}] p-10`}
+          style={{ flex: 0.95 }}
         >
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div style={{ display: "flex", fontSize: 20, letterSpacing: 1.5, color: MUTED }}>
+          <div tw="flex items-center justify-between">
+            <div tw={`flex text-[20px] tracking-[1.5px] text-[${MUTED}]`}>
               SIKATUNA VILLAGE, QC
             </div>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                backgroundColor: "#FEF3C7",
-                color: "#B45309",
-                borderRadius: 999,
-                padding: "6px 14px",
-                fontSize: 20,
-                fontWeight: 700,
-              }}
-            >
+            <div tw="flex items-center rounded-full bg-[#FEF3C7] px-3.5 py-1.5 text-[20px] font-bold text-[#B45309]">
               94 MATCH
             </div>
           </div>
 
           {/* Composition bar — rent is only ~64% of the real cost. */}
-          <div style={{ display: "flex", gap: 3, marginTop: 26 }}>
+          <div tw="flex mt-[26px]" style={{ gap: 3 }}>
             {SEGMENTS.map((segment) => (
               <div
                 key={segment.color}
-                style={{
-                  display: "flex",
-                  height: 14,
-                  borderRadius: 999,
-                  backgroundColor: segment.color,
-                  width: `${segment.share}%`,
-                }}
+                tw={`h-3.5 w-[${segment.share}%] rounded-full bg-[${segment.color}]`}
               />
             ))}
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column", marginTop: 30 }}>
+          <div tw="flex flex-col mt-[30px]">
             <Line label="Rent" amount="₱22,000" color={SEGMENTS[0].color} />
-            <Line label="Everything else" amount="₱12,499" color={SEGMENTS[2].color} />
+            <Line
+              label="Everything else"
+              amount="₱12,499"
+              color={SEGMENTS[2].color}
+            />
           </div>
 
           <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              backgroundColor: INK,
-              borderRadius: 12,
-              padding: "18px 22px",
-              color: SURFACE,
-            }}
+            tw={`flex items-center justify-between rounded-xl bg-[${INK}] px-[22px] py-[18px] text-[${SURFACE}]`}
           >
-            <span style={{ fontSize: 19, letterSpacing: 1.5 }}>TRUE MONTHLY COST</span>
-            <span style={{ fontSize: 46, fontWeight: 800, letterSpacing: -1.5 }}>
+            <span tw="text-[19px] tracking-[1.5px]">TRUE MONTHLY COST</span>
+            <span tw="text-[46px] font-extrabold tracking-[-1.5px]">
               ₱34,499
             </span>
           </div>
 
-          <div style={{ display: "flex", marginTop: 22, fontSize: 22, color: DANGER }}>
+          <div tw={`flex mt-[22px] text-[22px] text-[${DANGER}]`}>
             ₱12,499 more than the ad — 57% above.
           </div>
         </div>

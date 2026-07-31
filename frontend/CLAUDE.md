@@ -27,6 +27,7 @@ a session doesn't "fix" working code into a half-migration:
 | Rule | Status |
 |---|---|
 | `src/features/` slices, Zod, throwing API client, PascalCase | **Adopted** |
+| Motion (`motion/react`) for scroll entrances | **Adopted, scoped** — landing page only, via `MotionRoot`. `LazyMotion` + `domAnimation` + `strict`, so `m.*` is the only legal component and `motion.*` throws. State, hover, press, and disclosure stay in CSS. See `components/motion/Reveal.tsx` before adding any reveal. |
 | shadcn/ui primitives | **Deferred** — `components/ui/` holds hand-built primitives on the same token system. Swap is a deliberate, separate task. |
 | TanStack Query | **Deferred** — nothing on the public surface has server state. Adopt with the first authenticated screen. |
 | TanStack Form | **Deferred** — pairs with the shadcn decision. Forms use Zod schemas with local state and a shared submit helper. |

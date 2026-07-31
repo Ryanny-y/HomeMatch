@@ -1,3 +1,5 @@
+import type { CSSProperties } from "react";
+
 import { peso } from "@/lib/format";
 import { SAMPLE_UNIT } from "@/lib/sample-listing";
 
@@ -53,7 +55,12 @@ export function CostContrast() {
         aria-hidden="true"
         className="mt-5 flex h-2 w-full gap-0.5 overflow-hidden rounded-full"
       >
-        <span className="bg-ink" style={{ width: `${rentShare}%` }} />
+        {/* Rent's share is computed, so the value arrives as a custom property
+            and `w-(--…)` does the declaring. */}
+        <span
+          className="w-(--share) bg-ink"
+          style={{ "--share": `${rentShare}%` } as CSSProperties}
+        />
         <span className="flex-1 bg-brand" />
       </div>
 

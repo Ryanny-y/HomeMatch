@@ -8,6 +8,7 @@ import {
   PiPath,
 } from "react-icons/pi";
 
+import { Reveal } from "@/components/motion/Reveal";
 import { Card, IconBadge } from "@/components/ui/Card";
 import { Eyebrow, Section, SectionHeading } from "@/components/ui/Section";
 
@@ -21,14 +22,12 @@ type Feature = {
   title: string;
   body: ReactNode;
   icon: IconType;
-  tint: string;
 };
 
 const FEATURES: readonly Feature[] = [
   {
     title: "Commute intelligence",
     icon: PiPath,
-    tint: "bg-cyan-50 text-cyan-600",
     body: (
       <>
         Drive time, transit time, and a separate rush-hour estimate to the
@@ -41,7 +40,6 @@ const FEATURES: readonly Feature[] = [
   {
     title: "Neighborhood intelligence",
     icon: PiMapTrifold,
-    tint: "bg-violet-50 text-violet-600",
     body: (
       <>
         Groceries, schools, hospitals, and the nearest transit for every unit,
@@ -53,7 +51,6 @@ const FEATURES: readonly Feature[] = [
   {
     title: "Discovery",
     icon: PiCards,
-    tint: "bg-amber-50 text-amber-600",
     body: (
       <>
         Review apartments one at a time and mark each one Interested, Skip, or
@@ -66,7 +63,6 @@ const FEATURES: readonly Feature[] = [
   {
     title: "Save & shortlist",
     icon: PiBookmarkSimple,
-    tint: "bg-rose-50 text-rose-600",
     body: (
       <>
         Everything you save lands in one place with its score and true monthly
@@ -80,17 +76,17 @@ const FEATURES: readonly Feature[] = [
 export function SupportingFeatures() {
   return (
     <Section id="supporting-features" tone="surface" labelledBy="supporting-heading">
-      <div className="rise max-w-3xl">
+      <Reveal className="max-w-3xl">
         <Eyebrow icon={PiGridFour}>Also included</Eyebrow>
         <SectionHeading id="supporting-heading">
           The context you would otherwise gather by hand.
         </SectionHeading>
-      </div>
+      </Reveal>
 
       <div className="mt-12 grid gap-5 sm:grid-cols-2">
         {FEATURES.map((feature) => (
           <Card key={feature.title} tone="sunken" className="h-full p-6 sm:p-7">
-            <IconBadge icon={feature.icon} className={feature.tint} />
+            <IconBadge icon={feature.icon} tone="onSunken" />
             <h3 className="mt-4 text-xl font-extrabold tracking-[-0.03em]">
               {feature.title}
             </h3>

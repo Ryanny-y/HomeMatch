@@ -40,16 +40,43 @@ export function Card({
 }
 
 /**
- * A tinted square holding a single icon. Colour is passed as utility classes so
- * a feature card can carry its category hue without a new component per colour.
+ * A neutral square holding a single icon.
+ *
+ * The tone is a closed set, not a colour you pass in. It used to take a
+ * free-form `className` "expected to set both a background and a text colour",
+ * and that is exactly how nineteen raw Tailwind hues got onto a page whose six
+ * cost colours are supposed to mean something — `bg-violet-50` on a feature
+ * card is one letter away from the violet that means "parking", and Tailwind 4's
+ * `violet-600` is not even the same value as `--color-cat-parking`.
+ *
+ * So the badge is neutral everywhere. Colour on this page belongs to the four
+ * roles listed in `globals.css`, and an icon on a marketing card is none of
+ * them. What differentiates these cards is the icon's shape, which is what an
+ * icon is for.
+ *
+ * The tone names the surface the badge sits *on*, so it can invert against it:
+ * a sunken chip on a white card, a white chip on a sunken card. Either way the
+ * fill is only ~1.1:1 against its card, so the hairline is what makes the
+ * square read — it is load-bearing, not trim.
  */
+type BadgeTone = "onSurface" | "onSunken" | "onDark";
+
+const badgeTones: Record<BadgeTone, string> = {
+  onSurface: "border-line bg-surface-sunken text-ink-soft",
+  onSunken: "border-line bg-surface text-ink-soft",
+  onDark: "border-white/15 bg-white/10 text-white",
+};
+
 export function IconBadge({
   icon: Icon,
+  tone = "onSurface",
   className,
   size = "md",
 }: {
   icon: IconType;
-  /** Expected to set both a background and a text colour. */
+  /** Which surface the badge sits on — it inverts against it. */
+  tone?: BadgeTone;
+  /** Layout only. Colour comes from `tone`. */
   className?: string;
   size?: "sm" | "md";
 }) {
@@ -59,7 +86,7 @@ export function IconBadge({
   return (
     <span
       aria-hidden="true"
-      className={`inline-flex ${box} shrink-0 items-center justify-center rounded-chip ${className ?? ""}`}
+      className={`inline-flex ${box} shrink-0 items-center justify-center rounded-chip border ${badgeTones[tone]} ${className ?? ""}`}
     >
       <Icon className={glyph} />
     </span>
