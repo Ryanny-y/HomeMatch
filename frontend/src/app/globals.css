@@ -1,26 +1,397 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* ---------------------------------------------------------------------------
+   HomeMatch AI — design tokens
+
+   Palette follows the Real Estate/Property recommendation from the UI/UX
+   database: trust blue primary, gold accent, near-white ground, white cards.
+   The extra hues are not decoration — each one is bound to a cost category, so
+   the same colour always means the same line item whether it appears as a chip
+   in the itemised list or as a segment in the composition bar.
+
+   Amber is fill-only. #F59E0B on white is 2.1:1, so anywhere amber has to be
+   read as text it uses --color-gold-ink (#B45309, 4.95:1) instead.
+--------------------------------------------------------------------------- */
+
+@theme {
+  /* Ground and surfaces */
+  --color-canvas: #f8fafc;
+  --color-surface: #ffffff;
+  --color-surface-sunken: #f1f5f9;
+
+  /* Text ramp. `muted` is the lightest value still safe for body copy. */
+  --color-ink: #0f172a;
+  --color-ink-soft: #334155;
+  --color-ink-muted: #475569;
+  --color-ink-faint: #94a3b8;
+
+  --color-line: #e2e8f0;
+  --color-line-strong: #cbd5e1;
+
+  /* Brand — every primary action, link, and pass state. */
+  --color-brand: #2563eb;
+  --color-brand-dark: #1d4ed8;
+  --color-brand-deep: #1e3a8a;
+  --color-brand-soft: #eff6ff;
+  --color-brand-line: #bfdbfe;
+
+  /* Gold — the match score and highlights. */
+  --color-gold: #f59e0b;
+  --color-gold-ink: #b45309;
+  --color-gold-soft: #fef3c7;
+  --color-gold-line: #fde68a;
+
+  /* Cost categories. Bound 1:1 to the lines of a true-cost breakdown. */
+  --color-cat-rent: #2563eb;
+  --color-cat-parking: #7c3aed;
+  --color-cat-utilities: #f59e0b;
+  --color-cat-internet: #0891b2;
+  --color-cat-dues: #e11d48;
+  --color-cat-movein: #ea580c;
+
+  --color-danger: #dc2626;
+  --color-danger-soft: #fef2f2;
+  --color-danger-line: #fecaca;
+
+  --radius-card: 0.875rem;
+  --radius-chip: 0.5rem;
+
+  --shadow-card: 0 1px 2px rgb(15 23 42 / 0.04), 0 4px 16px rgb(15 23 42 / 0.06);
+  --shadow-card-lift: 0 2px 4px rgb(15 23 42 / 0.05), 0 12px 32px rgb(15 23 42 / 0.1);
+
+  /* Motion. Two curves and four durations, so timing means something: how far
+     a thing moved and how much it cost, not which file it was written in.
+     `arrival` decelerates hard — things land and stay landed. `state` is for
+     tint and opacity, where overshoot would read as a glitch. */
+  --ease-arrival: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-state: cubic-bezier(0.3, 0, 0, 1);
+
+  --dur-feedback: 120ms; /* a press answering back */
+  --dur-state: 200ms; /* hover, tint, tone */
+  --dur-move: 320ms; /* a panel or disclosure changing size */
+  --dur-focal: 700ms; /* the authored entrance, and nothing else */
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  /* One family carries display and body; mono is reserved for figures and
+     labels so numbers stay column-aligned in every cost table. */
+  --font-display: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+  --font-body: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+  /* Labels and eyebrows only — never amounts. See the `[data-figure]` rule. */
+  --font-mono: var(--font-jetbrains), var(--font-jakarta), ui-monospace,
+    SFMono-Regular, monospace;
 }
 
-@media (prefers-color-scheme: dark) {
+@layer base {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    color-scheme: light;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    scroll-padding-top: 5.5rem;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+  }
+
+  body {
+    background-color: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: var(--font-body);
+    font-size: 1rem;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+    text-wrap: balance;
+  }
+
+  /* Figures stay in the body family rather than the mono.
+     Plus Jakarta Sans supports real tabular numerals — with `tnum` every digit
+     is exactly the same advance — so amounts still align down a cost column,
+     and the ₱ comes from the same face as the digits. Setting figures in
+     JetBrains Mono instead broke every price across two typefaces, because
+     that face has no U+20B1 and the symbol fell through to a system serif.
+     The mono is still used for small uppercase labels, which need no ₱. */
+  [data-figure] {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+    white-space: nowrap;
+  }
+
+  ::selection {
+    background-color: var(--color-brand-line);
+    color: var(--color-ink);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-brand);
+    outline-offset: 2px;
+    border-radius: 4px;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* ---------------------------------------------------------------------------
+   Custom utilities.
+
+   Declared with `@utility` rather than as plain classes in `@layer components`,
+   so Tailwind treats them as first-class utilities: they sort correctly against
+   the rest of the output and compose with variants (`md:rise`, `group-hover:lift`)
+   instead of being inert class names that happen to exist.
+
+   ---------------------------------------------------------------------------
+   MOTION
+
+   One authored moment: the cost statement assembling itself. Rent is wiped in
+   first — a wide blue bar and a single figure — and then the five costs a
+   listing never shows arrive behind it while the total climbs from the
+   advertised rent to what the unit actually costs, and the gap callout lands
+   last, after the number has stopped moving. That sequence is the page's
+   argument performed rather than asserted, and it runs in exactly two places:
+   the hero card on load, and the true-cost card when it is scrolled to.
+
+   Everything else is support. Entrances are quiet and short. Hover, press, and
+   disclosure exist to acknowledge an action or explain a state change, never to
+   decorate. Nothing animates width, height, or position; nothing loops.
+
+   Two triggers, and the distinction matters:
+     `-load`  time-based, for anything already on screen at first paint.
+     `-view`  scroll-driven via `animation-timeline: view()`, so no JavaScript
+              is involved. Where the timeline is unsupported the animation runs
+              once at load and lands on the same final state, so content is
+              never trapped in a hidden keyframe.
+--------------------------------------------------------------------------- */
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* A wipe rather than a scaleX. Scaling squashes all six segments together, so
+   they arrive as one shape; an inset clip reveals them at their true widths,
+   which means rent genuinely lands first and the hidden costs follow it. The
+   bar and the argument then say the same thing. */
+@keyframes wipe-x {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+@keyframes panel-drop {
+  from {
+    opacity: 0;
+    transform: translateY(-0.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Skip link: off-screen until focused, then parked over the header. */
+@utility skip-link {
+  position: absolute;
+  left: 1rem;
+  top: 0.75rem;
+  z-index: 100;
+  transform: translateY(-200%);
+  transition: transform var(--dur-feedback) ease-out;
+
+  &:focus-visible {
+    transform: translateY(0);
+  }
+}
+
+/* The quiet entrance for prose blocks. Deliberately shorter and shallower than
+   the focal sequence: a section heading arriving is not an event. */
+@utility rise {
+  @media (prefers-reduced-motion: no-preference) {
+    animation: rise-in 420ms var(--ease-arrival) both;
+    animation-timeline: view();
+    animation-range: entry 0% cover 22%;
+  }
+}
+
+/* Sibling stagger for grids that genuinely read as a list. Progress-based
+   timelines ignore `animation-delay`, so the offset is expressed as a shifted
+   `animation-range` instead — each child starts a little further into the
+   scroll. Children carry `--i`; callers cap it so a six-up grid never trails.  */
+@utility stagger {
+  @media (prefers-reduced-motion: no-preference) {
+    & > * {
+      animation: rise-in 420ms var(--ease-arrival) both;
+      animation-timeline: view();
+      animation-range: entry calc(var(--i, 0) * 5%) cover
+        calc(22% + var(--i, 0) * 5%);
+    }
+  }
+}
+
+@utility lift {
+  @media (prefers-reduced-motion: no-preference) {
+    transition:
+      transform var(--dur-state) var(--ease-arrival),
+      box-shadow var(--dur-state) var(--ease-arrival),
+      border-color var(--dur-state) var(--ease-state);
+
+    &:hover {
+      transform: translateY(-3px);
+      box-shadow: var(--shadow-card-lift);
+    }
+
+    /* The press returns most of the distance, fast — a card that stays lifted
+       while held reads as unresponsive. */
+    &:active {
+      transform: translateY(-1px);
+      transition-duration: var(--dur-feedback);
+    }
+  }
+}
+
+/* --- The focal sequence ---------------------------------------------------- */
+
+/* The sequence, in the order the argument is made. The ring sweeps first, the
+   bar wipes in behind it at 100ms, the total starts counting at 300ms (see
+   `COUNT_DELAY` in `lib/motion.ts`), and the gap callout lands at 900ms — a
+   beat after the figure settles, so it reads as the conclusion rather than as
+   another part of the card. `--ease-arrival` is front-loaded enough that each
+   move is perceptually over well before its nominal duration; the numbers here
+   were tuned against what the eye sees, not against the durations on paper. */
+@utility wipe-load {
+  @media (prefers-reduced-motion: no-preference) {
+    animation: wipe-x var(--dur-focal) var(--ease-arrival) 100ms both;
+  }
+}
+
+@utility wipe-view {
+  @media (prefers-reduced-motion: no-preference) {
+    animation: wipe-x var(--dur-focal) var(--ease-arrival) both;
+    animation-timeline: view();
+    animation-range: entry 0% cover 28%;
+  }
+}
+
+/* The gap callout is the payload, so it waits for the total to finish counting
+   and then arrives on its own. Holding it back is the whole point: shown at the
+   same time as the number, it would read as part of the card's furniture. */
+@utility land-late-load {
+  @media (prefers-reduced-motion: no-preference) {
+    animation: rise-in 420ms var(--ease-arrival) 900ms both;
+  }
+}
+
+@utility land-late-view {
+  @media (prefers-reduced-motion: no-preference) {
+    animation: rise-in 420ms var(--ease-arrival) both;
+    animation-timeline: view();
+    animation-range: entry 14% cover 36%;
+  }
+}
+
+/* --- Relationship ---------------------------------------------------------- */
+
+/* Hovering an itemised line dims every bar segment but its own. The bar and the
+   list are two readings of one fact, and this is the cheapest way to say so —
+   no JavaScript, no extra markup beyond the category already stamped on both
+   ends. Enhancement only: the colour-matched dot already carries the mapping
+   for anyone not using a pointer. */
+@utility statement {
+  /* The row's own highlight is painted by a pseudo-element rather than a
+     background, so it can bleed past the row's edges without disturbing the
+     hairline rules between lines or shifting a single figure. */
+  & [data-row] {
+    position: relative;
+    isolation: isolate;
+  }
+
+  & [data-row]::before {
+    content: "";
+    position: absolute;
+    inset: 1px -0.625rem;
+    z-index: -1;
+    border-radius: var(--radius-chip);
+    background-color: rgb(15 23 42 / 0.04);
+    opacity: 0;
+  }
+
+  & [data-row]:hover::before {
+    opacity: 1;
+  }
+
+  &:has([data-row]:hover) [data-seg] {
+    opacity: 0.24;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    & [data-seg],
+    & [data-row]::before {
+      transition: opacity var(--dur-state) var(--ease-state);
+    }
+  }
+
+  &:has([data-row="rent"]:hover) [data-seg="rent"],
+  &:has([data-row="parking"]:hover) [data-seg="parking"],
+  &:has([data-row="utilities"]:hover) [data-seg="utilities"],
+  &:has([data-row="internet"]:hover) [data-seg="internet"],
+  &:has([data-row="dues"]:hover) [data-seg="dues"],
+  &:has([data-row="movein"]:hover) [data-seg="movein"] {
+    opacity: 1;
+  }
+}
+
+/* --- State ----------------------------------------------------------------- */
+
+/* Native <details> has no open transition, so an answer appears instantly and
+   the questions below it jump. `::details-content` plus `interpolate-size` fixes
+   that without JavaScript or a hand-rolled accordion; where either is
+   unsupported the panel simply snaps open exactly as it does today. */
+@utility disclosure {
+  @media (prefers-reduced-motion: no-preference) {
+    interpolate-size: allow-keywords;
+
+    &::details-content {
+      block-size: 0;
+      overflow: hidden;
+      opacity: 0;
+      transition:
+        content-visibility var(--dur-move) allow-discrete,
+        block-size var(--dur-move) var(--ease-arrival),
+        opacity var(--dur-move) var(--ease-state);
+    }
+
+    &[open]::details-content {
+      block-size: auto;
+      opacity: 1;
+    }
+  }
+}
+
+/* The mobile nav pushes content down rather than covering it, so it has to
+   explain where the extra height came from. Entry only — closing is instant,
+   because an exit the user has already committed to is just latency. */
+@utility panel-in {
+  @media (prefers-reduced-motion: no-preference) {
+    animation: panel-drop var(--dur-move) var(--ease-arrival) both;
+  }
 }

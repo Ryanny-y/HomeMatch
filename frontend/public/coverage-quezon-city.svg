@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 460" width="640" height="460" role="img">
+  <title>HomeMatch AI coverage diagram</title>
+
+  <defs>
+    <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse">
+      <path d="M32 0H0v32" fill="none" stroke="#E2E8F0" stroke-width="1" />
+    </pattern>
+  </defs>
+
+  <rect width="640" height="460" fill="#FFFFFF" />
+  <rect width="640" height="404" fill="url(#grid)" opacity="0.8" />
+
+  <!-- Planned expansion: the rest of Metro Manila -->
+  <path
+    d="M64 44 L556 44 L588 200 L520 372 L268 404 L96 340 L48 176 Z"
+    fill="none"
+    stroke="#CBD5E1"
+    stroke-width="2"
+    stroke-dasharray="7 7"
+  />
+  <text x="512" y="80" fill="#94A3B8" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="13" letter-spacing="1.4" text-anchor="end">METRO MANILA</text>
+
+  <!-- Live coverage: Quezon City -->
+  <path
+    d="M150 62 L332 40 L432 112 L456 232 L380 342 L232 372 L140 292 L116 160 Z"
+    fill="#EFF6FF"
+    stroke="#2563EB"
+    stroke-width="2.5"
+    stroke-linejoin="round"
+  />
+
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="13" fill="#0F172A" letter-spacing="0.6">
+    <circle cx="252" cy="112" r="5" fill="#2563EB" />
+    <text x="266" y="117">Trinoma</text>
+
+    <circle cx="212" cy="208" r="5" fill="#2563EB" />
+    <text x="226" y="213">UP Diliman</text>
+
+    <circle cx="344" cy="176" r="6" fill="#F59E0B" stroke="#0F172A" stroke-width="1.5" />
+    <text x="358" y="181">Katipunan / Ateneo</text>
+
+    <circle cx="292" cy="286" r="5" fill="#2563EB" />
+    <text x="306" y="291">Cubao</text>
+
+    <circle cx="398" cy="304" r="5" fill="#2563EB" />
+    <text x="412" y="309">Eastwood</text>
+  </g>
+
+  <text x="176" y="88" fill="#1D4ED8" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="15" font-weight="600" letter-spacing="2.2">QUEZON CITY</text>
+
+  <!-- Legend -->
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="13" letter-spacing="0.6">
+    <line x1="48" y1="404" x2="592" y2="404" stroke="#E2E8F0" stroke-width="1" />
+
+    <rect x="48" y="426" width="18" height="12" rx="2" fill="#EFF6FF" stroke="#2563EB" stroke-width="2" />
+    <text x="76" y="437" fill="#0F172A">Live now</text>
+
+    <rect x="212" y="426" width="18" height="12" rx="2" fill="none" stroke="#CBD5E1" stroke-width="2" stroke-dasharray="4 4" />
+    <text x="240" y="437" fill="#64748B">Expansion planned</text>
+  </g>
+</svg>

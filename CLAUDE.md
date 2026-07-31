@@ -92,7 +92,12 @@ MinIO stands in for S3/R2 — the backend uses `@aws-sdk/client-s3` against it u
 
 ## Frontend conventions
 
-`frontend/CLAUDE.md` defers to `frontend/AGENTS.md`, which carries one critical instruction: **this is Next.js 16, which has breaking changes relative to training data.** Read the relevant guide in `frontend/node_modules/next/dist/docs/` before writing App Router code rather than relying on remembered APIs. Tailwind 4 is configured through `@tailwindcss/postcss` — there is no `tailwind.config.js`.
+`frontend/CLAUDE.md` is the authoritative ruleset (feature slices in `src/features/`, Zod at the boundary, one throwing API client, strict TypeScript, accessibility floor). Read it before writing frontend code. Points worth knowing up front:
+
+- **This is Next.js 16**, which has breaking changes relative to training data. Read the relevant guide in `frontend/node_modules/next/dist/docs/` rather than relying on remembered APIs — `params` and `searchParams` are Promises and must be awaited.
+- **Tailwind 4 is configured CSS-first** through `@theme` in `src/app/globals.css`; there is no `tailwind.config.js`. Custom utilities use `@utility`, not bare classes in `@layer components`.
+- **Three rules in that file are deliberately not adopted yet** — shadcn/ui, TanStack Query, and TanStack Form. It carries an adoption-status table saying so; check it before "fixing" code to match a rule that isn't live.
+- `src/app/` holds routes only. A route composes feature components; it never implements them.
 
 ## Architecture decisions already locked
 
