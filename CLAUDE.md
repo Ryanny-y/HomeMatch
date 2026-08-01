@@ -60,11 +60,29 @@ npx vitest run -t "rejects a listing over budget"
 npx vitest run --no-file-parallelism    # required for integration tests (shared test DB)
 ```
 
-### Known broken scripts (Stage 0 gaps — fix rather than work around)
+### CI
 
-- `npm run typecheck -w backend` references `tsconfig.tools.json`, which does not exist yet. It must be created to cover `tests/` and `src/**/__tests__/**`, which the main tsconfig deliberately excludes from the build.
-- `npm run build -w backend` calls `copy:prisma`, which is not defined in `backend/package.json`.
-- `docker-compose.yml` mounts `./docker/postgres-init`, which does not exist — so the `homematch_test` database is **not** created automatically on a fresh volume. Create it manually or add the init script before writing integration tests.
+`.github/workflows/ci.yml` runs on every push and on PRs into `main`: lint → typecheck →
+test → build, in one job against a Postgres 17 service container.
+
+Two things it does that are easy to forget when running checks by hand, because both produce
+output that is gitignored and therefore absent on a fresh clone:
+
+- **`npm run build:shared` first.** `@homematch/shared` resolves through its compiled `dist/`,
+  so nothing on either side typechecks until it has been built once.
+- **`npm run prisma:generate -w backend`.** The client is generated into `src/generated`,
+  which is gitignored.
+
+CI supplies configuration through the workflow's `env:` block rather than a file, since `.env`
+and `.env.test` are both gitignored. `src/shared/config/env.ts` is fail-fast, so **adding a
+required key there breaks CI until the workflow is updated too.**
+
+The backend has no ESLint config; `npm run typecheck` (which covers `src`, plus `tests/`,
+`scripts/` and the seed via `tsconfig.tools.json`) is its lint gate. Adding ESLint there is an
+open improvement.
+
+To reproduce a CI failure locally, run the steps in workflow order — `npm test -w backend`
+already chains `prisma migrate deploy` against the test database.
 
 ## Local infrastructure
 

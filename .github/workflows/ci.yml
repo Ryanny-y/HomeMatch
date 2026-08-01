@@ -1,0 +1,115 @@
+name: CI
+
+# Every push, plus PRs into main. Pushes cover feature branches before a PR
+# exists; the pull_request trigger is what makes the check available as a
+# branch-protection requirement later.
+on:
+  push:
+  pull_request:
+    branches: [main]
+
+# A second push to the same branch makes the first run irrelevant. Cancelling
+# it frees the runner instead of paying for an answer nobody will read.
+# `main` is excluded: those runs are the record of what landed.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  verify:
+    name: Lint, typecheck, test, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    # Integration tests hit a real database — mocking Prisma here would test the
+    # mock, not the schema. The container is named `homematch_test` directly via
+    # POSTGRES_DB, so the init script docker-compose needs locally is unnecessary.
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: homematch
+          POSTGRES_PASSWORD: homematch_ci_password
+          POSTGRES_DB: homematch_test
+        ports:
+          - 5432:5432
+        # Prisma fails confusingly against a container that is up but not yet
+        # accepting connections, so the readiness gate matters.
+        options: >-
+          --health-cmd "pg_isready -U homematch -d homematch_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      # `.env` and `.env.test` are gitignored, so CI supplies configuration
+      # here instead. `src/shared/config/env.ts` parses this at import time and
+      # throws on anything missing — every key below is load-bearing.
+      #
+      # None of these are secrets. The database is a throwaway container and the
+      # JWT secret signs tokens that live and die inside one job.
+      DATABASE_URL: postgresql://homematch:homematch_ci_password@localhost:5432/homematch_test
+      FRONTEND_ORIGIN: http://localhost:3000
+      PUBLIC_APP_URL: http://localhost:3000
+      JWT_SECRET: ci-only-not-a-real-secret-000000000000
+      # Matches .env.test. Without it the logger defaults to `info` and every
+      # expected 401 in the suite prints a warning, burying real failures.
+      LOG_LEVEL: silent
+      S3_ENDPOINT: http://localhost:9000
+      S3_REGION: us-east-1
+      S3_BUCKET: homematch-test
+      S3_ACCESS_KEY_ID: ci
+      S3_SECRET_ACCESS_KEY: ci-secret
+      S3_FORCE_PATH_STYLE: "true"
+      # RESEND_API_KEY and MAIL_FROM are deliberately absent: env.ts only
+      # requires them in production, and the mailer is a no-op under
+      # NODE_ENV=test. A CI run must never send real email.
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      # `@homematch/shared` resolves through its compiled `dist/`, so the
+      # backend and frontend cannot typecheck until it has been built once.
+      - name: Build shared package
+        run: npm run build:shared
+
+      # The Prisma client is generated into `src/generated`, which is gitignored
+      # — without this step nothing that imports it will compile.
+      - name: Generate Prisma client
+        run: npm run prisma:generate -w backend
+
+      - name: Lint frontend
+        run: npm run lint -w frontend
+
+      # There is no ESLint config for the backend, so this is its lint gate:
+      # `tsc --noEmit` across src, plus tsconfig.tools.json for tests, scripts
+      # and the seed. Adding ESLint to the backend would strengthen this.
+      - name: Typecheck backend
+        run: npm run typecheck
+
+      - name: Typecheck frontend
+        run: npx tsc --noEmit
+        working-directory: frontend
+
+      # `npm test` chains `prisma migrate deploy` before vitest, so the schema
+      # is applied to the service container by the same command developers run
+      # locally. Integration tests share one database and run serially.
+      - name: Test backend
+        run: npm test -w backend
+        env:
+          NODE_ENV: test
+
+      # A green lint-and-test on code that does not compile is a false pass.
+      - name: Build backend
+        run: npm run build:backend
+
+      - name: Build frontend
+        run: npm run build -w frontend
