@@ -21,6 +21,19 @@ import type { IssuedSession } from "./auth.types";
 
 const VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000;
 
+/**
+ * How long a password reset link stays usable.
+ *
+ * **Sixty minutes is not an arbitrary figure.** `ForgotPasswordForm` tells the
+ * user "the link works once and expires in 60 minutes" as a statement of fact,
+ * and the reset email repeats it. Changing this without changing both is the
+ * app lying to someone at the exact moment they are locked out.
+ *
+ * Much shorter than the 24h verification window on purpose: this token can
+ * change a credential, so its blast radius while live is far larger.
+ */
+const PASSWORD_RESET_TTL_MS = 60 * 60 * 1000;
+
 const REFRESH_GRACE_MS = 10_000;
 
 function normaliseEmail(email: string): string {
@@ -227,6 +240,79 @@ export async function resendVerification(rawEmail: string): Promise<void> {
   if (!user || user.emailVerified) return;
 
   await sendVerification(user);
+}
+
+/**
+ * Start a password reset.
+ *
+ * **Always resolves, whether or not the account exists.** The forgot-password
+ * screen already says "if an account exists for X, a link is on its way", and
+ * any other behaviour here would make an unauthenticated endpoint into an
+ * account-existence oracle — the same rule as `resendVerification`.
+ */
+export async function requestPasswordReset(rawEmail: string): Promise<void> {
+  const user = await repo.findUserByEmail(normaliseEmail(rawEmail));
+
+  if (!user) return;
+
+  const token = generateOpaqueToken();
+
+  await repo.replacePasswordResetToken({
+    userId: user.id,
+    tokenHash: hashToken(token),
+    expiresAt: new Date(Date.now() + PASSWORD_RESET_TTL_MS),
+  });
+
+  await mailer.sendPasswordResetEmail(user.email, token);
+}
+
+/**
+ * Finish a password reset.
+ *
+ * Does **not** issue a session. The reset screen sends the user to the login
+ * form afterwards, which means the new password gets exercised immediately —
+ * and whoever completes a reset should have to prove they know what they just
+ * set, rather than being handed a session by the link alone.
+ */
+export async function resetPassword(
+  rawToken: string,
+  newPassword: string,
+): Promise<void> {
+  const row = await repo.findPasswordResetToken(hashToken(rawToken));
+
+  // One message for missing, consumed and expired. Distinguishing them tells an
+  // attacker holding a stale token whether it was ever real.
+  const rejected = new UnauthorizedError(
+    "This reset link is no longer valid. Request a new one and it'll work.",
+  );
+
+  if (!row || row.consumedAt || row.expiresAt.getTime() <= Date.now()) {
+    throw rejected;
+  }
+
+  const { count } = await repo.consumePasswordReset({
+    tokenId: row.id,
+    userId: row.userId,
+    passwordHash: await hashPassword(newPassword),
+  });
+
+  if (count === 0) {
+    // Lost a race with a simultaneous click on the same link. The other request
+    // set the password; this one changed nothing and must not claim otherwise.
+    throw rejected;
+  }
+
+  /**
+   * Every refresh family is revoked inside that transaction, which is what the
+   * success screen's "any other devices already signed in have been logged out"
+   * refers to.
+   *
+   * Worth being precise, because the copy slightly overstates it: an access
+   * token already issued stays valid until it expires — at most
+   * ACCESS_TTL_MINUTES. That is the same accepted window the whole JWT design
+   * carries, not something specific to reset. Nothing can refresh past it.
+   */
+  logger.info({ userId: row.userId }, "Password reset — all sessions revoked");
 }
 
 /** Prisma's unique-constraint error, narrowed without importing its error class. */

@@ -54,6 +54,39 @@ model RefreshToken {
   @@map("refresh_tokens")
 }
 
+/// Single-use password reset token, delivered as a link.
+///
+/// A separate table from VerificationToken rather than one table with a `type`
+/// column, because the two are not interchangeable: this one has a much shorter
+/// TTL (60 minutes, a figure the UI states as fact) and it can change a
+/// credential. Keeping them apart means a bug in the verification path cannot
+/// mint something that resets a password.
+///
+/// Consuming one revokes every refresh family the user has — the reset screen
+/// promises "any other devices already signed in have been logged out", and a
+/// reset that leaves an intruder's session alive is theatre.
+model PasswordResetToken {
+  id String @id @default(uuid()) @db.Uuid
+
+  tokenHash String @unique
+
+  userId String @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  expiresAt DateTime
+
+  /// Single-use. Guarded in the UPDATE's where-clause rather than by a
+  /// read-then-write, so two simultaneous clicks on the same link cannot both
+  /// succeed.
+  consumedAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("password_reset_tokens")
+}
+
 /// Single-use email confirmation token, delivered as a link.
 ///
 /// Issuing a new one invalidates every outstanding token for that user — the UI

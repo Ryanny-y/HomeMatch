@@ -1,7 +1,9 @@
 import { Router } from "express";
 import {
+  forgotPasswordSchema,
   loginSchema,
   resendVerificationSchema,
+  resetPasswordPayloadSchema,
   signupSchema,
   verifyEmailSchema,
 } from "@homematch/shared";
@@ -9,6 +11,7 @@ import { requireAuth } from "../../shared/middleware/requireAuth";
 import { validate } from "../../shared/middleware/validate";
 import {
   loginLimiter,
+  passwordResetLimiter,
   registerLimiter,
   resendLimiter,
   tokenLimiter,
@@ -55,4 +58,25 @@ authRouter.post(
   resendLimiter,
   validate({ body: resendVerificationSchema }),
   controller.resendVerification,
+);
+
+/**
+ * Password reset. Neither route is authenticated, by definition — someone who
+ * could sign in would not be here.
+ *
+ * `resetPasswordPayloadSchema`, not `resetPasswordSchema`: the latter carries
+ * the `confirmation` field, which is a form concern and never crosses the wire.
+ */
+authRouter.post(
+  "/forgot-password",
+  passwordResetLimiter,
+  validate({ body: forgotPasswordSchema }),
+  controller.forgotPassword,
+);
+
+authRouter.post(
+  "/reset-password",
+  tokenLimiter,
+  validate({ body: resetPasswordPayloadSchema }),
+  controller.resetPassword,
 );

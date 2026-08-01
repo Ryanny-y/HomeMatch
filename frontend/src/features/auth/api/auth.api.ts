@@ -17,12 +17,12 @@ import type { AuthenticatedUser } from "@/features/auth/types";
  *   GET  /api/auth/me                   —                                    ✅
  *   POST /api/auth/verify-email         { token }                            ✅
  *   POST /api/auth/resend-verification  { email }                            ✅
- *   POST /api/auth/forgot-password      { email }                            ❌ not built
- *   POST /api/auth/reset-password       { token, password }                  ❌ not built
+ *   POST /api/auth/forgot-password      { email }                            ✅
+ *   POST /api/auth/reset-password       { token, password }                  ✅
  *
- * The last two are called by `ForgotPasswordForm` and `ResetPasswordForm` and
- * will 404 — a deliberate scope cut, not an oversight. Tracked in the vault
- * note `homematch-auth-hardening`.
+ * `reset-password` sends only `{ token, password }` — `confirmation` is a form
+ * concern and never crosses the wire, which is why the API validates against
+ * `resetPasswordPayloadSchema` rather than the schema the form uses.
  *
  * `refresh` is absent from this module on purpose: it is never called from
  * feature code. `lib/api.ts` invokes it automatically on a 401, behind a

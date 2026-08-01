@@ -26,7 +26,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * (TS1309). Vitest's own resolver is happy with it, so `npm run typecheck` is
  * the only thing that catches it.
  */
-const { prismaMock, sendVerificationEmail, verifyPasswordMock } = vi.hoisted(
+const {
+  prismaMock,
+  sendVerificationEmail,
+  sendPasswordResetEmail,
+  verifyPasswordMock,
+} = vi.hoisted(
   () => ({
     prismaMock: {
       user: { findUnique: vi.fn(), create: vi.fn(), update: vi.fn() },
@@ -42,9 +47,16 @@ const { prismaMock, sendVerificationEmail, verifyPasswordMock } = vi.hoisted(
         deleteMany: vi.fn(),
         updateMany: vi.fn(),
       },
+      passwordResetToken: {
+        findUnique: vi.fn(),
+        create: vi.fn(),
+        deleteMany: vi.fn(),
+        updateMany: vi.fn(),
+      },
       $transaction: vi.fn(),
     },
     sendVerificationEmail: vi.fn(),
+    sendPasswordResetEmail: vi.fn(),
     verifyPasswordMock: vi.fn(),
   }),
 );
@@ -55,7 +67,7 @@ vi.mock("../../../lib/prisma", () => ({
 }));
 
 vi.mock("../../../shared/mail/mailer", () => ({
-  mailer: { sendVerificationEmail },
+  mailer: { sendVerificationEmail, sendPasswordResetEmail },
 }));
 
 vi.mock("../../../shared/security/password", async (importOriginal) => {
@@ -346,6 +358,108 @@ describe("resendVerification", () => {
     await service.resendVerification(USER.email);
 
     expect(sendVerificationEmail).not.toHaveBeenCalled();
+  });
+});
+
+describe("requestPasswordReset", () => {
+  it("resolves silently and sends nothing for an unknown address", async () => {
+    prismaMock.user.findUnique.mockResolvedValue(null);
+
+    await expect(service.requestPasswordReset("ghost@example.com")).resolves.toBeUndefined();
+
+    // The integration test can only see the 200; this is what proves no email
+    // went out, which is the half an attacker could otherwise time.
+    expect(sendPasswordResetEmail).not.toHaveBeenCalled();
+    expect(prismaMock.passwordResetToken.create).not.toHaveBeenCalled();
+  });
+
+  it("stores only the hash of the token it emails", async () => {
+    prismaMock.user.findUnique.mockResolvedValue(USER);
+    prismaMock.passwordResetToken.deleteMany.mockResolvedValue({ count: 0 });
+    prismaMock.passwordResetToken.create.mockResolvedValue({ id: "prt-1" });
+
+    await service.requestPasswordReset(USER.email);
+
+    const emailed = sendPasswordResetEmail.mock.calls[0]?.[1] as string;
+    const stored = prismaMock.passwordResetToken.create.mock.calls[0]?.[0] as {
+      data: { tokenHash: string };
+    };
+
+    // A database dump must not yield working reset links.
+    expect(stored.data.tokenHash).not.toBe(emailed);
+    expect(stored.data.tokenHash).toHaveLength(64);
+  });
+
+  it("normalises the email before looking it up", async () => {
+    prismaMock.user.findUnique.mockResolvedValue(null);
+
+    await service.requestPasswordReset("  SAM@Example.COM ");
+
+    expect(prismaMock.user.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { email: "sam@example.com" } }),
+    );
+  });
+});
+
+describe("resetPassword", () => {
+  const live = {
+    id: "prt-1",
+    userId: USER.id,
+    expiresAt: new Date(Date.now() + 60_000),
+    consumedAt: null,
+  };
+
+  it("rejects a consumed token", async () => {
+    prismaMock.passwordResetToken.findUnique.mockResolvedValue({
+      ...live,
+      consumedAt: new Date(),
+    });
+
+    await expect(service.resetPassword("used", "brand-new-pass-1")).rejects.toThrow(
+      UnauthorizedError,
+    );
+    expect(prismaMock.user.update).not.toHaveBeenCalled();
+  });
+
+  it("rejects an expired token", async () => {
+    prismaMock.passwordResetToken.findUnique.mockResolvedValue({
+      ...live,
+      expiresAt: new Date(Date.now() - 1),
+    });
+
+    await expect(service.resetPassword("stale", "brand-new-pass-1")).rejects.toThrow(
+      UnauthorizedError,
+    );
+  });
+
+  it("gives missing, consumed and expired tokens the identical message", async () => {
+    const messages: string[] = [];
+
+    for (const row of [
+      null,
+      { ...live, consumedAt: new Date() },
+      { ...live, expiresAt: new Date(Date.now() - 1) },
+    ]) {
+      prismaMock.passwordResetToken.findUnique.mockResolvedValue(row);
+      const error = await service
+        .resetPassword("t", "brand-new-pass-1")
+        .catch((e: Error) => e);
+      messages.push((error as Error).message);
+    }
+
+    // Distinguishing them tells someone holding a stale token whether it was
+    // ever real, and for which account.
+    expect(new Set(messages).size).toBe(1);
+  });
+
+  it("rejects when a simultaneous click already consumed the token", async () => {
+    prismaMock.passwordResetToken.findUnique.mockResolvedValue(live);
+    // updateMany matched nothing: the other request won the race.
+    prismaMock.$transaction.mockResolvedValue([{ count: 0 }, { id: USER.id }, { count: 0 }]);
+
+    await expect(service.resetPassword("raced", "brand-new-pass-1")).rejects.toThrow(
+      UnauthorizedError,
+    );
   });
 });
 

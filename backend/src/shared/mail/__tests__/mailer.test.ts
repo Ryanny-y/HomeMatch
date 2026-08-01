@@ -59,8 +59,13 @@ describe("sending", () => {
 
     expect(sendMock).toHaveBeenCalledOnce();
     expect(loggerMock.info).toHaveBeenCalledWith(
-      expect.objectContaining({ to: "sam@example.com", emailId: "email-1" }),
-      "Verification email sent",
+      // `kind` distinguishes the two templates now that both share one send path.
+      expect.objectContaining({
+        to: "sam@example.com",
+        kind: "verify",
+        emailId: "email-1",
+      }),
+      "Email sent",
     );
   });
 
@@ -76,6 +81,89 @@ describe("sending", () => {
     // usable in a client that blocks HTML, and it helps deliverability.
     expect(payload.html).toContain(expected);
     expect(payload.text).toContain(expected);
+  });
+});
+
+describe("password reset email", () => {
+  it("links to /reset-password, not the verification page", async () => {
+    sendMock.mockResolvedValue(OK);
+
+    await resolveMailer().sendPasswordResetEmail("sam@example.com", "tok-r");
+
+    const payload = sendMock.mock.calls[0]?.[0] as { html: string; text: string };
+    const expected = "http://localhost:3000/reset-password?token=tok-r";
+
+    expect(payload.html).toContain(expected);
+    expect(payload.text).toContain(expected);
+    expect(payload.html).not.toContain("/verify-email");
+  });
+
+  it("states the 60-minute expiry the forgot-password screen promises", async () => {
+    sendMock.mockResolvedValue(OK);
+
+    await resolveMailer().sendPasswordResetEmail("sam@example.com", "tok-r");
+
+    const payload = sendMock.mock.calls[0]?.[0] as { text: string; subject: string };
+
+    // `ForgotPasswordForm` tells the user "expires in 60 minutes" as a fact. If
+    // this drifts from the TTL in the service, the app lies to the user.
+    expect(payload.text).toContain("60 minutes");
+    expect(payload.text).toContain("works once");
+    expect(payload.subject).toMatch(/reset/i);
+  });
+
+  it("uses a different idempotency key from a verification email for the same token", async () => {
+    sendMock.mockResolvedValue(OK);
+    const mailer = resolveMailer();
+
+    await mailer.sendVerificationEmail("sam@example.com", "same-token");
+    await mailer.sendPasswordResetEmail("sam@example.com", "same-token");
+
+    const verify = (sendMock.mock.calls[0]?.[1] as { idempotencyKey: string }).idempotencyKey;
+    const reset = (sendMock.mock.calls[1]?.[1] as { idempotencyKey: string }).idempotencyKey;
+
+    // Sharing a key would let Resend deduplicate two genuinely different emails
+    // into one, and the user would silently never receive the second.
+    expect(verify).not.toBe(reset);
+    expect(reset).toMatch(/^reset-/);
+  });
+
+  it("retries and diagnoses exactly like the verification email", async () => {
+    sendMock.mockResolvedValueOnce(failure(429)).mockResolvedValueOnce(OK);
+
+    await resolveMailer().sendPasswordResetEmail("sam@example.com", "tok-r");
+
+    // The point of sharing one send path: the second template cannot quietly
+    // lose the retry behaviour.
+    expect(sendMock).toHaveBeenCalledTimes(2);
+    expect(loggerMock.error).not.toHaveBeenCalled();
+  });
+
+  it("never logs the reset link in production", async () => {
+    envMock.isProduction = true;
+    sendMock.mockResolvedValue(OK);
+
+    await resolveMailer().sendPasswordResetEmail("sam@example.com", "tok-secret-reset");
+
+    const logged = JSON.stringify([
+      loggerMock.info.mock.calls,
+      loggerMock.warn.mock.calls,
+      loggerMock.error.mock.calls,
+    ]);
+
+    // A reset link is the most powerful credential this system emails.
+    expect(logged).not.toContain("tok-secret-reset");
+  });
+
+  it("logs the reset link in development so the flow is testable", async () => {
+    sendMock.mockResolvedValue(failure(403, "validation_error"));
+
+    await resolveMailer().sendPasswordResetEmail("other@example.com", "tok-r");
+
+    expect(loggerMock.info).toHaveBeenCalledWith(
+      expect.objectContaining({ link: expect.stringContaining("reset-password") }),
+      expect.stringContaining("development only"),
+    );
   });
 });
 

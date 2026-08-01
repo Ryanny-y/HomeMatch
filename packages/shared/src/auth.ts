@@ -79,6 +79,19 @@ export const resetPasswordSchema = z
     path: ["confirmation"],
   });
 
+/**
+ * What actually goes over the wire when resetting a password.
+ *
+ * `resetPasswordSchema` above carries `confirmation` and a `.refine()` that the
+ * two match — that is a form concern, and the second field never leaves the
+ * browser. The API validates this shape instead, so the backend does not
+ * require a field it has no use for and cannot check anything about.
+ */
+export const resetPasswordPayloadSchema = z.object({
+  token: z.string().min(1),
+  password: newPasswordField,
+});
+
 export const verifyEmailSchema = z.object({
   token: z.string().min(1),
 });
@@ -111,6 +124,7 @@ export type LoginInput = z.infer<typeof loginSchema>;
 export type SignupInput = z.infer<typeof signupSchema>;
 export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
+export type ResetPasswordPayload = z.infer<typeof resetPasswordPayloadSchema>;
 export type VerifyEmailInput = z.infer<typeof verifyEmailSchema>;
 export type ResendVerificationInput = z.infer<typeof resendVerificationSchema>;
 export type UserRole = z.infer<typeof userRoleSchema>;

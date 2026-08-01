@@ -350,6 +350,190 @@ describe("email verification", () => {
   });
 });
 
+describe("password reset", () => {
+  /** Mints a real reset token the same way the service stores one. */
+  async function issueResetToken(email: string): Promise<string> {
+    const raw = generateOpaqueToken();
+    const user = await prisma.user.findUniqueOrThrow({
+      where: { email },
+      select: { id: true },
+    });
+
+    await prisma.passwordResetToken.deleteMany({ where: { userId: user.id } });
+    await prisma.passwordResetToken.create({
+      data: {
+        userId: user.id,
+        tokenHash: hashToken(raw),
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+      },
+    });
+
+    return raw;
+  }
+
+  it("returns 200 for an address that does not exist", async () => {
+    const res = await request(app)
+      .post("/api/auth/forgot-password")
+      .send({ email: "ghost@example.com" });
+
+    // Anything else makes this an unauthenticated account-existence oracle,
+    // and the UI already promises a non-committal "if an account exists".
+    expect(res.status).toBe(200);
+  });
+
+  it("issues a token for a real account, and a second request kills the first", async () => {
+    const user = await createUser({ email: "sam@example.com" });
+
+    const first = await issueResetToken(user.email);
+    await request(app).post("/api/auth/forgot-password").send({ email: user.email });
+
+    // Otherwise every link ever sent stays live for its full hour.
+    const res = await request(app)
+      .post("/api/auth/reset-password")
+      .send({ token: first, password: "brand-new-pass-1" });
+
+    expect(res.status).toBe(401);
+  });
+
+  it("replaces the password: the old one stops working and the new one starts", async () => {
+    const user = await createUser({ email: "sam@example.com" });
+    const token = await issueResetToken(user.email);
+
+    const reset = await request(app)
+      .post("/api/auth/reset-password")
+      .send({ token, password: "brand-new-pass-1" });
+
+    expect(reset.status).toBe(200);
+    // No session handed back — the user is sent to the login form.
+    expect(reset.headers["set-cookie"]).toBeUndefined();
+
+    const withOld = await request(app)
+      .post("/api/auth/login")
+      .send({ email: user.email, password: TEST_PASSWORD });
+    expect(withOld.status).toBe(401);
+
+    const withNew = await request(app)
+      .post("/api/auth/login")
+      .send({ email: user.email, password: "brand-new-pass-1" });
+    expect(withNew.status).toBe(200);
+  });
+
+  /**
+   * The test this feature exists to pass.
+   *
+   * `ResetPasswordForm` tells the user "any other devices already signed in
+   * have been logged out". If that is not true, someone who resets a password
+   * *because* their account was compromised leaves the intruder signed in —
+   * the recovery does nothing and the user believes it did.
+   */
+  it("kills sessions that existed before the reset", async () => {
+    const user = await createUser({ email: "sam@example.com" });
+
+    const signedIn = await request(app)
+      .post("/api/auth/login")
+      .send({ email: user.email, password: TEST_PASSWORD });
+    const staleRefresh = readCookie(
+      signedIn.headers["set-cookie"] as unknown as string[],
+      REFRESH_COOKIE,
+    );
+
+    // That session is alive right now.
+    const before = await request(app)
+      .post("/api/auth/refresh")
+      .set("Cookie", cookieHeader({ [REFRESH_COOKIE]: staleRefresh }));
+    expect(before.status).toBe(200);
+
+    const rotated = readCookie(
+      before.headers["set-cookie"] as unknown as string[],
+      REFRESH_COOKIE,
+    );
+
+    const token = await issueResetToken(user.email);
+    await request(app)
+      .post("/api/auth/reset-password")
+      .send({ token, password: "brand-new-pass-1" });
+
+    const after = await request(app)
+      .post("/api/auth/refresh")
+      .set("Cookie", cookieHeader({ [REFRESH_COOKIE]: rotated }));
+
+    expect(after.status).toBe(401);
+  });
+
+  it("marks the address verified, because following the link proved the mailbox", async () => {
+    const user = await createUser({ email: "sam@example.com", emailVerified: false });
+    const token = await issueResetToken(user.email);
+
+    await request(app)
+      .post("/api/auth/reset-password")
+      .send({ token, password: "brand-new-pass-1" });
+
+    const after = await prisma.user.findUniqueOrThrow({
+      where: { id: user.id },
+      select: { emailVerified: true },
+    });
+    expect(after.emailVerified).toBe(true);
+  });
+
+  it("rejects a token that was already used", async () => {
+    const user = await createUser({ email: "sam@example.com" });
+    const token = await issueResetToken(user.email);
+
+    await request(app)
+      .post("/api/auth/reset-password")
+      .send({ token, password: "brand-new-pass-1" });
+
+    const again = await request(app)
+      .post("/api/auth/reset-password")
+      .send({ token, password: "another-password-2" });
+
+    expect(again.status).toBe(401);
+
+    // And the second attempt must not have changed anything.
+    const login = await request(app)
+      .post("/api/auth/login")
+      .send({ email: user.email, password: "brand-new-pass-1" });
+    expect(login.status).toBe(200);
+  });
+
+  it("rejects an expired token without saying it was ever real", async () => {
+    const user = await createUser({ email: "sam@example.com" });
+    const token = await issueResetToken(user.email);
+
+    await prisma.passwordResetToken.updateMany({
+      where: {},
+      data: { expiresAt: new Date(Date.now() - 1000) },
+    });
+
+    const expired = await request(app)
+      .post("/api/auth/reset-password")
+      .send({ token, password: "brand-new-pass-1" });
+
+    const nonsense = await request(app)
+      .post("/api/auth/reset-password")
+      .send({ token: "never-existed", password: "brand-new-pass-1" });
+
+    expect(expired.status).toBe(401);
+    expect(nonsense.body).toEqual(expired.body);
+  });
+
+  it("enforces password strength on the new password", async () => {
+    const user = await createUser({ email: "sam@example.com" });
+    const token = await issueResetToken(user.email);
+
+    const res = await request(app)
+      .post("/api/auth/reset-password")
+      .send({ token, password: "short" });
+
+    expect(res.status).toBe(422);
+    // The token must survive a rejected attempt, or a typo burns the link.
+    const retry = await request(app)
+      .post("/api/auth/reset-password")
+      .send({ token, password: "brand-new-pass-1" });
+    expect(retry.status).toBe(200);
+  });
+});
+
 /**
  * RBAC — the roadmap's stated acceptance criterion ("wrong-role access returns
  * 403") and the only thing that actually proves the guard works.

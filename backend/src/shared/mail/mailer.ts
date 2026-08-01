@@ -5,35 +5,88 @@ import { hashToken } from "../security/token";
 
 export type Mailer = {
   sendVerificationEmail(to: string, token: string): Promise<void>;
+  sendPasswordResetEmail(to: string, token: string): Promise<void>;
 };
 
-function verificationUrl(token: string): string {
-  const url = new URL("/verify-email", env.PUBLIC_APP_URL);
+/** Both emails carry a single-use token to a page that expects it in the URL. */
+function tokenUrl(path: string, token: string): string {
+  const url = new URL(path, env.PUBLIC_APP_URL);
   url.searchParams.set("token", token);
   return url.toString();
 }
 
-function verificationBody(link: string): { html: string; text: string } {
+function verificationUrl(token: string): string {
+  return tokenUrl("/verify-email", token);
+}
+
+function resetUrl(token: string): string {
+  return tokenUrl("/reset-password", token);
+}
+
+type Template = {
+  subject: string;
+  html: string;
+  text: string;
+};
+
+/**
+ * One body builder for both emails.
+ *
+ * The two differ only in wording, so the markup, the inline styles and the
+ * plain-text structure live here once. A second hand-rolled template is how the
+ * pair drifts into looking like mail from two different companies.
+ */
+function template(input: {
+  subject: string;
+  lead: string;
+  cta: string;
+  link: string;
+  smallPrint: string[];
+}): Template {
   return {
-    text: [
-      "Confirm your email to finish setting up HomeMatch.",
-      "",
-      link,
-      "",
-      "This link works once and expires in 24 hours.",
-      "If you didn't create a HomeMatch account, you can ignore this email.",
-    ].join("\n"),
+    subject: input.subject,
+    text: [input.lead, "", input.link, "", ...input.smallPrint].join("\n"),
     html: `
       <div style="font-family:system-ui,-apple-system,Segoe UI,sans-serif;font-size:16px;line-height:1.6;color:#0f172a">
-        <p>Confirm your email to finish setting up HomeMatch.</p>
-        <p><a href="${link}" style="color:#2563eb">Confirm my email</a></p>
+        <p>${input.lead}</p>
+        <p><a href="${input.link}" style="color:#2563eb">${input.cta}</a></p>
         <p style="color:#64748b;font-size:14px">
-          This link works once and expires in 24 hours.<br>
-          If you didn't create a HomeMatch account, you can ignore this email.
+          ${input.smallPrint.join("<br>")}
         </p>
       </div>
     `.trim(),
   };
+}
+
+function verificationTemplate(link: string): Template {
+  return template({
+    subject: "Confirm your email — HomeMatch",
+    lead: "Confirm your email to finish setting up HomeMatch.",
+    cta: "Confirm my email",
+    link,
+    smallPrint: [
+      "This link works once and expires in 24 hours.",
+      "If you didn't create a HomeMatch account, you can ignore this email.",
+    ],
+  });
+}
+
+/**
+ * The 60 minutes is not a loose figure: `ForgotPasswordForm` tells the user
+ * "the link works once and expires in 60 minutes" as a statement of fact. This
+ * copy, the TTL in the service, and that screen have to agree.
+ */
+function passwordResetTemplate(link: string): Template {
+  return template({
+    subject: "Reset your HomeMatch password",
+    lead: "Set a new password for your HomeMatch account.",
+    cta: "Choose a new password",
+    link,
+    smallPrint: [
+      "This link works once and expires in 60 minutes.",
+      "If you didn't ask to reset your password, ignore this email — your password stays as it is.",
+    ],
+  });
 }
 
 const MAX_ATTEMPTS = 3;
@@ -105,66 +158,80 @@ function describeFailure(error: SendError): string {
 function createResendMailer(apiKey: string, from: string): Mailer {
   const resend = new Resend(apiKey);
 
-  return {
-    async sendVerificationEmail(to, token) {
-      const link = verificationUrl(token);
-      const { html, text } = verificationBody(link);
+  /**
+   * Everything except the wording: retry, backoff, idempotency, diagnostics.
+   *
+   * Both emails share this on purpose. Duplicating the retry loop per template
+   * is how one of them quietly loses its backoff, and a second copy of the
+   * "never log the link" rule is a second chance to get it wrong.
+   *
+   * `kind` only names the operation in logs and seeds the idempotency key, so
+   * two different emails to the same address are never deduplicated together.
+   */
+  async function send(
+    kind: string,
+    to: string,
+    token: string,
+    body: Template,
+  ): Promise<void> {
+    /**
+     * Stable across retries of this send, unique per issued token.
+     *
+     * Without it, a retry after a timeout — where the request actually landed
+     * but the response was lost — delivers a second copy. Derived from the
+     * token's SHA-256 rather than the token itself, so the raw credential is
+     * never handed to a third party as metadata.
+     */
+    const idempotencyKey = `${kind}-${hashToken(token).slice(0, 32)}`;
 
-      /**
-       * Stable across retries of this send, unique per issued token.
-       *
-       * Without it, a retry after a timeout — where the request actually landed
-       * but the response was lost — delivers a second copy. Derived from the
-       * token's SHA-256 rather than the token itself so the raw credential is
-       * never handed to a third party as metadata.
-       */
-      const idempotencyKey = `verify-${hashToken(token).slice(0, 32)}`;
+    let lastError: SendError | null = null;
 
-      let lastError: SendError | null = null;
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
+      const { data, error } = await resend.emails.send(
+        { from, to, subject: body.subject, html: body.html, text: body.text },
+        { idempotencyKey },
+      );
 
-      for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
-        const { data, error } = await resend.emails.send(
-          {
-            from,
-            to,
-            subject: "Confirm your email — HomeMatch",
-            html,
-            text,
-          },
-          { idempotencyKey },
-        );
-
-        if (!error) {
-          logger.info({ to, emailId: data?.id, attempt }, "Verification email sent");
-          return;
-        }
-
-        lastError = error;
-
-        if (!isRetryable(error)) break;
-
-        if (attempt < MAX_ATTEMPTS) {
-          const wait = backoffMs(attempt);
-          logger.warn(
-            { to, attempt, statusCode: error.statusCode, retryInMs: wait },
-            "Verification email failed, retrying",
-          );
-          await delay(wait);
-        }
+      if (!error) {
+        logger.info({ to, kind, emailId: data?.id, attempt }, "Email sent");
+        return;
       }
 
-      // Never log `link` or `token` here: a verification link is a live,
-      // single-use credential, and log files travel further than databases do.
-      // The development-only wrapper below is the one deliberate exception.
-      logger.error(
-        {
-          to,
-          statusCode: lastError?.statusCode ?? null,
-          providerMessage: lastError?.message,
-          providerCode: lastError?.name,
-        },
-        describeFailure(lastError ?? { message: "", statusCode: null, name: "unknown" }),
-      );
+      lastError = error;
+
+      if (!isRetryable(error)) break;
+
+      if (attempt < MAX_ATTEMPTS) {
+        const wait = backoffMs(attempt);
+        logger.warn(
+          { to, kind, attempt, statusCode: error.statusCode, retryInMs: wait },
+          "Email send failed, retrying",
+        );
+        await delay(wait);
+      }
+    }
+
+    // Never log the link or the token here: both emails carry a live,
+    // single-use credential, and log files travel further than databases do.
+    // The development-only wrapper below is the one deliberate exception.
+    logger.error(
+      {
+        to,
+        kind,
+        statusCode: lastError?.statusCode ?? null,
+        providerMessage: lastError?.message,
+        providerCode: lastError?.name,
+      },
+      describeFailure(lastError ?? { message: "", statusCode: null, name: "unknown" }),
+    );
+  }
+
+  return {
+    sendVerificationEmail(to, token) {
+      return send("verify", to, token, verificationTemplate(verificationUrl(token)));
+    },
+    sendPasswordResetEmail(to, token) {
+      return send("reset", to, token, passwordResetTemplate(resetUrl(token)));
     },
   };
 }
@@ -190,6 +257,13 @@ function withDevLinkLogging(inner: Mailer): Mailer {
       );
       await inner.sendVerificationEmail(to, token);
     },
+    async sendPasswordResetEmail(to, token) {
+      logger.info(
+        { to, link: resetUrl(token) },
+        "Password reset link (development only — also attempting a real send)",
+      );
+      await inner.sendPasswordResetEmail(to, token);
+    },
   };
 }
 
@@ -210,6 +284,12 @@ function createLoggingMailer(): Mailer {
         "No RESEND_API_KEY set — verification link logged instead of emailed",
       );
     },
+    async sendPasswordResetEmail(to, token) {
+      logger.warn(
+        { to, link: resetUrl(token) },
+        "No RESEND_API_KEY set — password reset link logged instead of emailed",
+      );
+    },
   };
 }
 
@@ -217,6 +297,9 @@ function createLoggingMailer(): Mailer {
 function createNoopMailer(): Mailer {
   return {
     async sendVerificationEmail() {
+      /* intentionally does nothing */
+    },
+    async sendPasswordResetEmail() {
       /* intentionally does nothing */
     },
   };

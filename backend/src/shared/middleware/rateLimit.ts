@@ -90,6 +90,29 @@ export const resendLimiter = rateLimit({
   handler: handler("We've sent that a few times already. Check your spam folder."),
 });
 
+/**
+ * Requesting a password reset link.
+ *
+ * Same budget as resending verification — it sends billable email on demand and
+ * needs no credentials to call — but keyed and worded for reset, so a user who
+ * has hit one limit is not confusingly told about the other.
+ *
+ * Note this throttles *requesting* a link, not guessing one. A 32-byte token has
+ * nothing to brute force, which is precisely why this flow uses a link rather
+ * than a short code: a code would depend on this limiter for its security, and
+ * the in-memory store above means it does not hold across instances.
+ */
+export const passwordResetLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: limitFor(3),
+  keyGenerator: emailAndIpKey,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  handler: handler(
+    "We've sent a few reset links already. Check your inbox and spam folder.",
+  ),
+});
+
 /** Token submission — cheap, but brute-forcing a token should still be capped. */
 export const tokenLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,

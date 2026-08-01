@@ -1,7 +1,9 @@
 import type { Request, RequestHandler, Response } from "express";
 import type {
+  ForgotPasswordInput,
   LoginInput,
   ResendVerificationInput,
+  ResetPasswordPayload,
   SignupInput,
   VerifyEmailInput,
 } from "@homematch/shared";
@@ -65,6 +67,23 @@ export const me: RequestHandler = async (req, res) => {
 
 export const verifyEmail: RequestHandler = async (req, res) => {
   await service.verifyEmail((req.body as VerifyEmailInput).token);
+  res.status(200).json(ok(null));
+};
+
+export const forgotPassword: RequestHandler = async (req, res) => {
+  await service.requestPasswordReset((req.body as ForgotPasswordInput).email);
+
+  // Always 200 — see the service. Reporting failure here would leak whether the
+  // address is registered.
+  res.status(200).json(ok(null));
+};
+
+export const resetPassword: RequestHandler = async (req, res) => {
+  const { token, password } = req.body as ResetPasswordPayload;
+  await service.resetPassword(token, password);
+
+  // Deliberately no session: the reset screen sends the user to log in, which
+  // exercises the password they just set.
   res.status(200).json(ok(null));
 };
 

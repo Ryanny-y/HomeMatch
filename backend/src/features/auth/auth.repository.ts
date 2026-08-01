@@ -141,6 +141,21 @@ export function revokeFamily(familyId: string): Promise<{ count: number }> {
   });
 }
 
+/**
+ * Every family this user has — every device, every browser.
+ *
+ * Used by password reset. A reset that leaves an intruder's session alive is
+ * theatre: the victim changes their password and the attacker keeps browsing.
+ */
+export function revokeAllFamiliesForUser(
+  userId: string,
+): Promise<{ count: number }> {
+  return prisma.refreshToken.updateMany({
+    where: { userId, revokedAt: null },
+    data: { revokedAt: new Date() },
+  });
+}
+
 // ----------------------------------------------------------- verification ---
 
 export type VerificationTokenRow = {
@@ -201,6 +216,84 @@ export function consumeVerificationToken(input: {
         where: { id: input.userId },
         data: { emailVerified: true },
         select: { id: true },
+      }),
+    ])
+    .then(([consumed]) => consumed);
+}
+
+// -------------------------------------------------------- password reset ---
+
+export type PasswordResetTokenRow = {
+  id: string;
+  userId: string;
+  expiresAt: Date;
+  consumedAt: Date | null;
+};
+
+export function findPasswordResetToken(
+  tokenHash: string,
+): Promise<PasswordResetTokenRow | null> {
+  return prisma.passwordResetToken.findUnique({
+    where: { tokenHash },
+    select: { id: true, userId: true, expiresAt: true, consumedAt: true },
+  });
+}
+
+/**
+ * Issue a reset token, dropping any outstanding ones for that user.
+ *
+ * Requesting a second link must kill the first: otherwise every reset email
+ * ever sent stays live for its full hour, and a link recovered from an old
+ * inbox or a shared machine still works.
+ */
+export function replacePasswordResetToken(input: {
+  userId: string;
+  tokenHash: string;
+  expiresAt: Date;
+}): Promise<unknown> {
+  return prisma.$transaction([
+    prisma.passwordResetToken.deleteMany({ where: { userId: input.userId } }),
+    prisma.passwordResetToken.create({ data: input, select: { id: true } }),
+  ]);
+}
+
+/**
+ * The whole reset, atomically.
+ *
+ * Four writes that must not come apart — a crash between them would leave a
+ * consumed token with the old password still set, or a changed password with
+ * live sessions belonging to whoever prompted the reset:
+ *
+ *   1. burn the token   2. set the new password
+ *   3. mark the address verified   4. revoke every refresh family
+ *
+ * Step 3 is not a freebie thrown in: following a link sent to that address
+ * proves control of the mailbox, which is exactly what verification asks for.
+ *
+ * `consumedAt: null` in the where-clause is the single-use guard, enforced by
+ * the database rather than a read-then-write — two simultaneous clicks on the
+ * same link cannot both succeed. The returned `count` is how the service knows
+ * whether this call was the one that won.
+ */
+export function consumePasswordReset(input: {
+  tokenId: string;
+  userId: string;
+  passwordHash: string;
+}): Promise<{ count: number }> {
+  return prisma
+    .$transaction([
+      prisma.passwordResetToken.updateMany({
+        where: { id: input.tokenId, consumedAt: null },
+        data: { consumedAt: new Date() },
+      }),
+      prisma.user.update({
+        where: { id: input.userId },
+        data: { passwordHash: input.passwordHash, emailVerified: true },
+        select: { id: true },
+      }),
+      prisma.refreshToken.updateMany({
+        where: { userId: input.userId, revokedAt: null },
+        data: { revokedAt: new Date() },
       }),
     ])
     .then(([consumed]) => consumed);
