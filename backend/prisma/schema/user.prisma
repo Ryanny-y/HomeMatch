@@ -1,9 +1,3 @@
-/// Identity. Who someone is, and what they are allowed to be.
-///
-/// `admin` exists here but is absent from `userRoleSchema` in
-/// `@homematch/shared`, which is what the signup form and the register endpoint
-/// validate against. The only way to become an admin is the seed script. That
-/// asymmetry is deliberate and is the whole reason there are two role schemas.
 enum Role {
   renter
   landlord
@@ -12,26 +6,11 @@ enum Role {
 
 model User {
   id String @id @default(uuid()) @db.Uuid
-
-  /// Stored already trimmed and lowercased — normalisation happens once, at the
-  /// service boundary, before it ever reaches here.
-  ///
-  /// `backend/CLAUDE.md` allows either `@db.Citext` or a normalised column for
-  /// case-insensitive lookup. A normalised column is chosen because citext needs
-  /// a Postgres extension installed in every environment (dev, test, CI, prod),
-  /// and one environment missing it fails at runtime rather than at boot. A
-  /// plain unique index behaves identically and travels anywhere.
   email String @unique
-
-  /// argon2id. Never selected into a DTO, never logged, never leaves the service.
   passwordHash String
-
   fullName String
   role     Role    @default(renter)
 
-  /// Login does NOT require this to be true — the UI signs users in immediately
-  /// after register and routes them to /verify-email. Nothing enforces it
-  /// server-side yet; see the hardening backlog before assuming it gates anything.
   emailVerified Boolean @default(false)
 
   createdAt DateTime @default(now())

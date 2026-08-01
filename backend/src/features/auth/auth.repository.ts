@@ -2,15 +2,6 @@ import type { Role } from "@homematch/shared";
 import { prisma } from "../../lib/prisma";
 import { USER_DTO_SELECT } from "./auth.types";
 
-/**
- * Every Prisma call for auth. The service calls these; it never touches the
- * client directly.
- *
- * `select` is explicit everywhere — never `include` a whole row and never
- * return one to a caller that might forward it. `passwordHash` is only selected
- * by the one function whose job is to compare it.
- */
-
 export type UserDto = {
   id: string;
   email: string;
@@ -94,14 +85,6 @@ export function createRefreshToken(input: {
   });
 }
 
-/**
- * Spend one token and issue its successor, atomically.
- *
- * A transaction because the two halves must not come apart: marking the old one
- * spent without creating the new one logs the user out on a crash, and creating
- * the new one without marking the old spent leaves two live tokens — which the
- * next refresh would correctly read as theft.
- */
 export function rotateRefreshToken(input: {
   currentId: string;
   tokenHash: string;
@@ -127,13 +110,6 @@ export function rotateRefreshToken(input: {
   ]);
 }
 
-/**
- * Kill an entire login lineage.
- *
- * Used by logout and by reuse detection. `revokedAt: null` in the filter keeps
- * this idempotent — re-revoking a dead family is a no-op rather than a rewrite
- * that would move the timestamp and lose when it actually happened.
- */
 export function revokeFamily(familyId: string): Promise<{ count: number }> {
   return prisma.refreshToken.updateMany({
     where: { familyId, revokedAt: null },
@@ -141,12 +117,6 @@ export function revokeFamily(familyId: string): Promise<{ count: number }> {
   });
 }
 
-/**
- * Every family this user has — every device, every browser.
- *
- * Used by password reset. A reset that leaves an intruder's session alive is
- * theatre: the victim changes their password and the attacker keeps browsing.
- */
 export function revokeAllFamiliesForUser(
   userId: string,
 ): Promise<{ count: number }> {
@@ -174,13 +144,6 @@ export function findVerificationToken(
   });
 }
 
-/**
- * Issue a verification token, invalidating any outstanding ones first.
- *
- * The UI promises exactly this — "A new verification link is on its way. The
- * previous one no longer works." Deleting rather than marking consumed keeps
- * the table from accumulating rows for users who request several.
- */
 export function replaceVerificationToken(input: {
   userId: string;
   tokenHash: string;
@@ -195,13 +158,6 @@ export function replaceVerificationToken(input: {
   ]);
 }
 
-/**
- * Consume a token and flip the user's flag together.
- *
- * `consumedAt: null` in the where-clause makes this the single-use guard, and
- * it is enforced by the database rather than by a read-then-write in the
- * service — two simultaneous clicks on the same link cannot both succeed.
- */
 export function consumeVerificationToken(input: {
   tokenId: string;
   userId: string;
@@ -239,13 +195,6 @@ export function findPasswordResetToken(
   });
 }
 
-/**
- * Issue a reset token, dropping any outstanding ones for that user.
- *
- * Requesting a second link must kill the first: otherwise every reset email
- * ever sent stays live for its full hour, and a link recovered from an old
- * inbox or a shared machine still works.
- */
 export function replacePasswordResetToken(input: {
   userId: string;
   tokenHash: string;
@@ -257,24 +206,6 @@ export function replacePasswordResetToken(input: {
   ]);
 }
 
-/**
- * The whole reset, atomically.
- *
- * Four writes that must not come apart — a crash between them would leave a
- * consumed token with the old password still set, or a changed password with
- * live sessions belonging to whoever prompted the reset:
- *
- *   1. burn the token   2. set the new password
- *   3. mark the address verified   4. revoke every refresh family
- *
- * Step 3 is not a freebie thrown in: following a link sent to that address
- * proves control of the mailbox, which is exactly what verification asks for.
- *
- * `consumedAt: null` in the where-clause is the single-use guard, enforced by
- * the database rather than a read-then-write — two simultaneous clicks on the
- * same link cannot both succeed. The returned `count` is how the service knows
- * whether this call was the one that won.
- */
 export function consumePasswordReset(input: {
   tokenId: string;
   userId: string;

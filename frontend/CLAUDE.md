@@ -157,6 +157,17 @@ type ApiResponse<T> = {
 
 ---
 
+## COMMENTS
+
+- Comment only what the code cannot say for itself. If a comment restates the line below it, delete the comment rather than the line.
+- No narration (`// map over the items`), no obvious labels, no commented-out JSX or code left behind.
+- Reach for a clearer name, a smaller component, or an extracted well-named variable *before* reaching for a comment. A comment is what you write when the code genuinely cannot carry the meaning.
+- Do write one when the reason is not in the code: non-obvious logic, a design decision worth defending, a workaround (link the issue), an edge case, or an external constraint — a Next.js 16 behaviour, a browser quirk, an accessibility requirement that looks like dead weight until you know why.
+- Explain **why**, not **what**. The code already says what.
+- When you touch a file, delete or rewrite comments that have become redundant, obvious, or stale. A comment that no longer matches the code is worse than no comment.
+
+---
+
 ## ACCESSIBILITY
 
 Non-negotiable, and cheaper to keep than to retrofit:
@@ -186,4 +197,5 @@ Non-negotiable, and cheaper to keep than to retrofit:
 - No swallowed/ignored errors; surface them via the envelope's error path.
 - No manual form validation branches when a Zod schema exists.
 - No prop drilling more than ~2 levels; colocate or use context.
+- No comments that restate the code; no commented-out code; no stale comments left behind after an edit.
 - No invented social proof — user counts, ratings, and testimonials must be real or absent.

@@ -98,6 +98,18 @@ Adminer and MinIO are bound to `127.0.0.1` on purpose. Keep it that way.
 
 MinIO stands in for S3/R2 — the backend uses `@aws-sdk/client-s3` against it unchanged; only endpoint and credentials differ in production. `S3_FORCE_PATH_STYLE` must stay `true` for MinIO (no per-bucket DNS).
 
+## Code comments
+
+Applies to both workspaces. The per-workspace files restate it in their own terms.
+
+Comment only what the code cannot say for itself. A comment that restates the line below it should be deleted, not the line — and the same goes for narration (`// increment the counter`), obvious labels, and commented-out code.
+
+Reach for a clearer name, a smaller function, or an extracted well-named variable **before** reaching for a comment. A comment is what you write when the code genuinely cannot carry the meaning.
+
+Do write one when the reason lives outside the code: non-obvious logic, a complex algorithm, a design decision worth defending, a workaround (link the issue), an edge case, or an external constraint — a Prisma quirk, a Next.js 16 behaviour, a Resend status code that means something specific. Explain **why**, not **what**; the code already says what.
+
+When you touch a file, delete or rewrite comments that have become redundant, obvious, or stale. A comment that no longer matches the code is worse than no comment at all.
+
 ## Backend conventions
 
 `backend/CLAUDE.md` is the authoritative ruleset (feature-based structure, thin controllers, Zod-at-the-boundary via shared `validate` middleware, repository-owned Prisma calls, typed errors + one global handler, testing strategy). Read it before writing backend code. Points worth knowing up front:

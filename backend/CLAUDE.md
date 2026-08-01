@@ -147,6 +147,17 @@ router.post(
 
 ---
 
+## COMMENTS
+
+- Comment only what the code cannot say for itself. If a comment restates the line below it, delete the comment rather than the line.
+- No narration (`// increment the counter`), no obvious labels, no commented-out code left behind.
+- Reach for a clearer name, a smaller function, or an extracted well-named variable *before* reaching for a comment. A comment is what you write when the code genuinely cannot carry the meaning.
+- Do write one when the reason is not in the code: non-obvious logic, a complex algorithm, a design decision worth defending, a workaround (link the issue), an edge case, or an external constraint — a Prisma quirk, a driver limitation, a spec requirement.
+- Explain **why**, not **what**. The code already says what.
+- When you touch a file, delete or rewrite comments that have become redundant, obvious, or stale. A comment that no longer matches the code is worse than no comment.
+
+---
+
 ## TESTING (Vitest + supertest)
 
 - Colocate tests in the feature's `__tests__/` folder. Config in `vitest.config.ts` with `environment: 'node'`. Vitest handles TypeScript natively — there is no ts-jest/SWC step to configure.
@@ -179,4 +190,5 @@ router.post(
 - No scattered env/config reads; no secrets in code.
 - No `console.log`; no logging secrets or full payloads.
 - No skipping input validation "because it's internal."
+- No comments that restate the code; no commented-out code; no stale comments left behind after an edit.
 - No tests against the dev/prod database; no `listen()` inside tests; no `--forceExit` to hide open handles.
