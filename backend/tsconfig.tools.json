@@ -1,0 +1,33 @@
+{
+  // Type-checks everything the build deliberately excludes.
+  //
+  // `tsconfig.json` compiles `src/**/*.ts` into `dist/`, and it excludes tests
+  // for two different reasons: `tests/` sits outside `rootDir`, and
+  // `src/**/__tests__/**` would otherwise be emitted into the shipped output.
+  // Excluding them from the build is right; leaving them unchecked is not.
+  //
+  // `npm run typecheck` runs both projects, so nothing goes unchecked.
+  // `noEmit` because this project exists only to type-check.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": ".",
+    // Vitest globals are not enabled (see vitest.config.ts) — `describe`, `it`
+    // and `expect` are imported explicitly, so only node types are needed here.
+    "types": ["node"]
+  },
+  // `scripts/` and `prisma/seed.ts` are run with tsx and never built, so they
+  // are outside the main project — which left them entirely unchecked until
+  // they were added here. `.mts` for the vitest config because it uses ESM
+  // syntax; loaded as CommonJS, Vite warns it will break when
+  // `configLoader: 'native'` becomes the default.
+  "include": [
+    "src/**/*.ts",
+    "tests/**/*.ts",
+    "scripts/**/*.ts",
+    "prisma/**/*.ts",
+    "prisma.config.ts",
+    "vitest.config.mts"
+  ],
+  "exclude": ["node_modules", "dist", "src/generated"]
+}

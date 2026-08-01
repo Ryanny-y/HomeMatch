@@ -1,0 +1,80 @@
+/// Session mechanics — the tokens that keep someone signed in.
+///
+/// Separate from user.prisma because these are auth *machinery*, not identity:
+/// they churn constantly, they get swept, and none of them are things a user
+/// would recognise about themselves.
+///
+/// Both tables store only a SHA-256 of their token. The raw value exists in
+/// exactly one place — the cookie or the email link. A dump of these tables
+/// yields 64-char hex strings and no way back to a working credential.
+///
+/// SHA-256 rather than argon2 is deliberate and not an inconsistency with
+/// `User.passwordHash`: argon2 is slow on purpose because passwords are
+/// low-entropy and guessable. These tokens are 256 bits of CSPRNG output — no
+/// dictionary to attack, and this lookup sits on a hot path.
+
+/// One row per issued refresh token.
+///
+/// Tokens belong to a `familyId` — one family per login, inherited by every
+/// successor. Spending a token sets `rotatedAt` and issues a new row in the same
+/// family. Presenting an already-rotated token means two parties hold tokens
+/// from this family, so the whole family is revoked.
+model RefreshToken {
+  id String @id @default(uuid()) @db.Uuid
+
+  /// SHA-256 hex of the raw token. Unique so a collision is a constraint
+  /// violation rather than a silent session mix-up.
+  tokenHash String @unique
+
+  /// Shared by every successor descended from one login. Revoking is
+  /// `updateMany({ where: { familyId } })`.
+  familyId String @db.Uuid
+
+  userId String @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  expiresAt DateTime
+
+  /// Set when this token is spent. Its presence is what makes reuse detectable.
+  ///
+  /// Also drives the grace window: a token rotated within the last few seconds
+  /// is treated as an honest concurrent request (two browser tabs cannot share
+  /// a single-flight promise) rather than theft.
+  rotatedAt DateTime?
+
+  /// Set when the family is killed — logout, or detected reuse.
+  revokedAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  /// familyId: revocation. expiresAt: the sweep. userId: "sign out everywhere".
+  @@index([familyId])
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
+}
+
+/// Single-use email confirmation token, delivered as a link.
+///
+/// Issuing a new one invalidates every outstanding token for that user — the UI
+/// promises exactly this ("The previous one no longer works").
+model VerificationToken {
+  id String @id @default(uuid()) @db.Uuid
+
+  tokenHash String @unique
+
+  userId String @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  expiresAt DateTime
+
+  /// Single-use. A consumed token is rejected rather than silently re-accepted,
+  /// which is why the UI has a distinct "this link didn't work" screen.
+  consumedAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("verification_tokens")
+}

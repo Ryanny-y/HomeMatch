@@ -12,6 +12,12 @@ import {
  * attaches a token — it only sets `credentials: "include"` so the browser
  * carries the cookie.
  *
+ * It also owns the silent refresh: a 401 triggers one shared call to
+ * `/api/auth/refresh` and a replay of the original request. That lives here
+ * rather than in a feature so every caller gets it, and so there is exactly one
+ * refresh path — see the note on `refreshInFlight` for why more than one is
+ * actively harmful.
+ *
  * Every response arrives in the shared `ApiResponse` envelope. Failures throw
  * `ApiError` rather than returning a result union, so callers have one error
  * path and TanStack Query can take over unchanged once it is adopted.
@@ -72,7 +78,49 @@ function unreachable(): ApiError {
   );
 }
 
-async function request<T>(path: string, init: RequestInit): Promise<T> {
+const REFRESH_PATH = "/api/auth/refresh";
+
+/**
+ * The in-flight refresh, shared by every caller.
+ *
+ * **This is not an optimisation — without it the app signs users out.** The
+ * access token lasts 15 minutes, so when it expires every request on the page
+ * 401s at once. If each retried independently, they would all POST to
+ * `/refresh` carrying the same refresh token; the first rotates it and the rest
+ * arrive at a token that is already spent. The server reads that as a stolen
+ * token, revokes the whole family, and the user is thrown out mid-task having
+ * done nothing wrong.
+ *
+ * Sharing one promise means one refresh happens and everyone waits for it.
+ *
+ * The server also keeps a short grace window for the same reason, because two
+ * browser tabs are two JavaScript contexts and cannot share this variable. Both
+ * halves are needed; neither is sufficient.
+ */
+let refreshInFlight: Promise<boolean> | null = null;
+
+function refreshSession(): Promise<boolean> {
+  refreshInFlight ??= fetch(`${API_URL}${REFRESH_PATH}`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+  })
+    .then((response) => response.ok)
+    .catch(() => false)
+    .finally(() => {
+      // Cleared so the *next* expiry starts a fresh attempt rather than
+      // resolving instantly against a stale result.
+      refreshInFlight = null;
+    });
+
+  return refreshInFlight;
+}
+
+async function request<T>(
+  path: string,
+  init: RequestInit,
+  retryOn401 = true,
+): Promise<T> {
   let response: Response;
 
   try {
@@ -83,6 +131,22 @@ async function request<T>(path: string, init: RequestInit): Promise<T> {
     });
   } catch {
     throw unreachable();
+  }
+
+  /**
+   * A 401 usually just means the 15-minute access token lapsed. Refresh once
+   * and replay, so an expired token is invisible to the user.
+   *
+   * `retryOn401` guards the recursion: the replayed request must not refresh
+   * again, and a 401 from `/refresh` itself means the session is genuinely over
+   * — retrying it would loop.
+   */
+  if (response.status === 401 && retryOn401 && path !== REFRESH_PATH) {
+    const refreshed = await refreshSession();
+
+    if (refreshed) {
+      return request<T>(path, init, false);
+    }
   }
 
   let payload: ApiResponse<T>;

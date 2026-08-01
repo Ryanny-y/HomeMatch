@@ -4,3 +4,8 @@ node_modules
 .env
 !.env.example
 
+# Prisma client output. `npm run build` runs `prisma generate` before tsc, so
+# this is always regenerated — committing it would add thousands of lines of
+# generated diff that go stale the moment the schema changes.
+src/generated
+

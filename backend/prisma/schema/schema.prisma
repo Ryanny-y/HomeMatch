@@ -1,0 +1,25 @@
+// Datasource and generator ONLY.
+//
+// `backend/CLAUDE.md` requires the multi-file layout: Prisma concatenates every
+// *.prisma in this folder, so models live in domain files beside this one and
+// cross-file relations work with no imports. Adding a model here is a rule
+// violation, not a shortcut.
+//
+//   user.prisma     — User, Role
+//   session.prisma  — RefreshToken, VerificationToken
+
+generator client {
+  provider = "prisma-client"
+  output   = "../../src/generated/prisma"
+  // The backend compiles to CommonJS (see tsconfig `module: nodenext` and the
+  // note there about jose). The generator defaults to ESM, which would emit
+  // `import` statements into files that tsc then compiles as CJS.
+  moduleFormat = "cjs"
+}
+
+// No `url` here — Prisma 7 removed it from schema files (P1012). The connection
+// string for Migrate lives in `prisma.config.ts`, and the runtime client gets a
+// driver adapter instead (see src/lib/prisma.ts).
+datasource db {
+  provider = "postgresql"
+}
