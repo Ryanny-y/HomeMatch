@@ -143,9 +143,6 @@ describe("create and publish", () => {
       barangay: "Loyola Heights",
       lat: 14.6399,
       lng: 121.0776,
-      estUtilities: 1800,
-      estInternet: 1500,
-      availableFrom: "2026-09-01",
     });
 
     await prisma.listingImage.create({
@@ -181,12 +178,12 @@ describe("money", () => {
     await request(app)
       .patch(`/api/listings/${id}`)
       .set("Cookie", cookie)
-      .send({ rent: 18999.99, assocDues: 1234.56 });
+      .send({ rent: 18999.99, otherFees: 1234.56 });
 
     const res = await request(app).get(`/api/listings/${id}`).set("Cookie", cookie);
 
     expect(res.body.data.listing.rent).toBe(18999.99);
-    expect(res.body.data.listing.assocDues).toBe(1234.56);
+    expect(res.body.data.listing.otherFees).toBe(1234.56);
   });
 });
 
@@ -196,16 +193,12 @@ describe("true monthly cost", () => {
       rent: 18000,
       depositMonths: 2,
       advanceMonths: 1,
-      utilitiesIncluded: false,
-      estUtilities: 1800,
-      estInternet: 1500,
-      assocDues: 800,
-      otherFees: 200,
+      otherFees: 4300,
       parkingAvailable: true,
       parkingCost: 2500,
     });
 
-    // A seventh line would need a seventh hue and would break the contract
+    // A fifth line would need a fifth hue and would break the contract
     // documented in globals.css.
     for (const line of lines) {
       expect(COST_CATEGORIES).toContain(line.category);
@@ -213,21 +206,32 @@ describe("true monthly cost", () => {
     expect(new Set(lines.map((l) => l.category)).size).toBe(lines.length);
   });
 
-  it("folds other fees into dues rather than inventing a line", () => {
+  it("carries other fees as their own line", () => {
     const lines = computeTrueMonthlyCost({
       rent: 10000,
       depositMonths: 0,
       advanceMonths: 0,
-      utilitiesIncluded: true,
-      estUtilities: null,
-      estInternet: null,
-      assocDues: 500,
-      otherFees: 300,
+      otherFees: 800,
       parkingAvailable: false,
       parkingCost: null,
     });
 
-    expect(lines.find((l) => l.category === "dues")?.amount).toBe(800);
+    expect(lines.find((l) => l.category === "other")?.amount).toBe(800);
+  });
+
+  it("omits other costs entirely when there are none", () => {
+    // Absent, not a zero line: a breakdown should show what this unit charges
+    // rather than a fixed template with blanks in it.
+    const lines = computeTrueMonthlyCost({
+      rent: 10000,
+      depositMonths: 0,
+      advanceMonths: 0,
+      otherFees: null,
+      parkingAvailable: false,
+      parkingCost: null,
+    });
+
+    expect(lines.map((l) => l.category)).toEqual(["rent"]);
   });
 
   it("costs a bedspace correctly with no bedrooms", () => {
@@ -237,10 +241,6 @@ describe("true monthly cost", () => {
       rent: 4500,
       depositMonths: 1,
       advanceMonths: 1,
-      utilitiesIncluded: true,
-      estUtilities: null,
-      estInternet: null,
-      assocDues: null,
       otherFees: null,
       parkingAvailable: false,
       parkingCost: null,
@@ -248,23 +248,6 @@ describe("true monthly cost", () => {
 
     expect(lines.map((l) => l.category)).toEqual(["rent", "movein"]);
     expect(lines.find((l) => l.category === "movein")?.amount).toBe(750);
-  });
-
-  it("treats included utilities as zero, not unknown", () => {
-    const lines = computeTrueMonthlyCost({
-      rent: 10000,
-      depositMonths: 0,
-      advanceMonths: 0,
-      utilitiesIncluded: true,
-      estUtilities: 3000,
-      estInternet: null,
-      assocDues: null,
-      otherFees: null,
-      parkingAvailable: false,
-      parkingCost: null,
-    });
-
-    expect(lines.find((l) => l.category === "utilities")).toBeUndefined();
   });
 });
 

@@ -11,7 +11,11 @@
 
      1. BRAND BLUE   action and navigation. Buttons, links, focus rings.
      2. THE SIX CAT  identify a cost line. `CompositionBar` and `StatementRow`,
-        HUES         and nowhere else on the page.
+        HUES         and nowhere else on the page. The landing page's
+                     illustrative breakdown uses all six; a live listing
+                     resolves to four (`COST_CATEGORIES` in the shared package)
+                     because dues, utilities, and internet collapsed into one
+                     "other" line that takes `--color-cat-dues`.
      3. GOLD         the match score, the honest half of an answer — the
                      tradeoffs in `CriteriaList` — and work still owed.
      4. DANGER       the gap between advertised rent and true cost. Once.
