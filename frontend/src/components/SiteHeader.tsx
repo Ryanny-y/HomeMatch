@@ -4,9 +4,10 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { PiList, PiX } from "react-icons/pi";
 
-import { ButtonLink } from "@/components/ui/Button";
 import { Wordmark } from "@/components/ui/Logo";
-import { PRIMARY_NAV, SIGNUP_RENTER } from "@/lib/site";
+import type { AuthenticatedUser } from "@homematch/shared";
+import { PRIMARY_NAV } from "@/lib/site";
+import { SessionActions } from "@/components/SessionActions";
 
 /**
  * Sticky site header.
@@ -16,7 +17,7 @@ import { PRIMARY_NAV, SIGNUP_RENTER } from "@/lib/site";
  * disorienting than covering it, and it avoids the focus-trap and
  * scroll-locking machinery an overlay would need to be accessible.
  */
-export function SiteHeader() {
+export function SiteHeader({ user }: { user: AuthenticatedUser | null }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
@@ -72,14 +73,8 @@ export function SiteHeader() {
             </ul>
           </nav>
 
-          <div className="hidden items-center gap-3 lg:flex">
-            <Link
-              href="/login"
-              className="rounded-chip px-3 py-2 text-[0.9375rem] font-medium text-ink-muted transition-colors hover:text-brand-dark"
-            >
-              Log in
-            </Link>
-            <ButtonLink href={SIGNUP_RENTER}>Get started</ButtonLink>
+          <div className="hidden lg:flex">
+            <SessionActions user={user} />
           </div>
 
           <button
@@ -116,25 +111,9 @@ export function SiteHeader() {
                     </Link>
                   </li>
                 ))}
-                <li>
-                  <Link
-                    href="/login"
-                    onClick={() => setMenuOpen(false)}
-                    className="block py-3 font-medium text-ink-soft transition-colors hover:text-brand-dark"
-                  >
-                    Log in
-                  </Link>
-                </li>
               </ul>
 
-              <ButtonLink
-                href={SIGNUP_RENTER}
-                size="lg"
-                onClick={() => setMenuOpen(false)}
-                className="mt-4 w-full"
-              >
-                Get started
-              </ButtonLink>
+              <SessionActions user={user} stacked onNavigate={() => setMenuOpen(false)} />
             </nav>
           </div>
         ) : null}

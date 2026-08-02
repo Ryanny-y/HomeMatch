@@ -1,19 +1,31 @@
 import type { Metadata } from "next";
-
-import { ComingSoon } from "@/components/ComingSoon";
+import { LandlordDashboard } from "@/features/listings";
+import { isStatusFilter } from "@/features/listings/listing-status";
 
 export const metadata: Metadata = {
-  title: "Landlord dashboard",
+  title: "Your units",
   robots: { index: false, follow: false },
 };
 
-export default function LandlordPage() {
+export default async function LandlordPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const { status } = await searchParams;
+  const requested = Array.isArray(status) ? status[0] : status;
+
   return (
-    <ComingSoon
-      eyebrow="For landlords"
-      title="The landlord dashboard is being built"
-      description="This is where you'll manage your units and see views, saves, and expressions of interest per listing. Creating a landlord account works today, so you'll be set up the moment it opens."
-      action={{ label: "List your property", href: "/signup?role=landlord" }}
-    />
+    <main className="mx-auto w-full max-w-5xl px-4 py-10 sm:px-6 lg:py-14">
+      <header className="mb-6">
+        <h1 className="text-3xl font-extrabold tracking-[-0.03em] text-ink">Your units</h1>
+        <p className="mt-2 max-w-2xl text-[0.9375rem] leading-[1.6] text-ink-muted">
+          A unit goes live once renters can answer the questions they decide on: what it
+          really costs, where exactly it is, and what it looks like.
+        </p>
+      </header>
+
+      <LandlordDashboard filter={isStatusFilter(requested) ? requested : "all"} />
+    </main>
   );
 }

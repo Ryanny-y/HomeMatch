@@ -1,0 +1,523 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import type { GeocodePrecision, UpdateListingInput } from "@homematch/shared";
+import { Alert } from "@/components/ui/Alert";
+import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
+import { ConfirmDialog } from "@/components/ui/Dialog";
+import {
+  CheckboxField,
+  DateField,
+  NumberField,
+  SelectField,
+  TextField,
+  TextareaField,
+} from "@/components/ui/Field";
+import { ApiError } from "@/lib/api";
+import type { Listing } from "@/features/listings/api/listings.api";
+import {
+  useArchiveListing,
+  useDeleteListing,
+  usePublishListing,
+  useUpdateListing,
+} from "@/features/listings/hooks/useListings";
+import {
+  useSavedField,
+  useSavedNumberField,
+} from "@/features/listings/hooks/useSavedField";
+import { LocationPicker } from "./LocationPicker";
+import { PhotoManager } from "./PhotoManager";
+import { ReadinessStatement } from "./ReadinessStatement";
+
+/**
+ * The long half of the draft-first flow.
+ *
+ * Sections rather than a wizard: editing wants you to jump to one field, and a
+ * wizard forces a second, different UI to do that. Section ids double as the
+ * anchor targets the readiness chips link to.
+ *
+ * Fields save on blur, one PATCH per field. It costs more requests than a save
+ * button, but a landlord who fills three fields and closes the tab keeps three
+ * fields — and on a flaky mobile connection a single large submit is the thing
+ * most likely to lose everything.
+ */
+function Section({
+  id,
+  title,
+  blurb,
+  children,
+}: {
+  id: string;
+  title: string;
+  blurb?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section
+      id={id}
+      // scroll-mt keeps a linked heading clear of the sticky header.
+      className="scroll-mt-24 rounded-card border border-line bg-surface p-5 shadow-card sm:p-6"
+    >
+      <h2 className="text-lg font-extrabold tracking-[-0.02em] text-ink">{title}</h2>
+      {blurb ? (
+        <p className="mt-1 text-[0.875rem] leading-snug text-ink-muted">{blurb}</p>
+      ) : null}
+      <div className="mt-5 space-y-5">{children}</div>
+    </section>
+  );
+}
+
+export function EditListingForm({ listing }: { listing: Listing }) {
+  const router = useRouter();
+  const update = useUpdateListing(listing.id);
+  const publish = usePublishListing();
+  const archive = useArchiveListing();
+  const destroy = useDeleteListing();
+
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [publishError, setPublishError] = useState<string | null>(null);
+
+  const perBed = listing.listingType === "bedspace";
+
+  function save(patch: UpdateListingInput) {
+    update.mutate(patch);
+  }
+
+  /**
+   * Every typed field is a local draft that saves when it loses focus.
+   *
+   * Binding these straight to `listing` and saving per keystroke is what broke
+   * the description (the schema trims, so a trailing space was deleted as it
+   * was typed) and deposit/advance (an empty field fell back to the old number
+   * and snapped back). See `useSavedField`.
+   *
+   * `false` on the last argument marks a field that must hold a number:
+   * clearing it is allowed while typing and restored on blur.
+   */
+  const titleField = useSavedField(listing.title, (v) => {
+    if (v.trim() === "") return false;
+    save({ title: v });
+    return true;
+  });
+  const descriptionField = useSavedField(listing.description ?? "", (v) => {
+    save({ description: v });
+    return true;
+  });
+  const addressField = useSavedField(listing.address, (v) => {
+    if (v.trim() === "") return false;
+    save({ address: v });
+    return true;
+  });
+  const barangayField = useSavedField(listing.barangay ?? "", (v) => {
+    save({ barangay: v });
+    return true;
+  });
+  const cityField = useSavedField(listing.city, (v) => {
+    if (v.trim() === "") return false;
+    save({ city: v });
+    return true;
+  });
+  const nearestTransitField = useSavedField(listing.nearestTransit ?? "", (v) => {
+    save({ nearestTransit: v });
+    return true;
+  });
+  const floodRiskNoteField = useSavedField(listing.floodRiskNote ?? "", (v) => {
+    save({ floodRiskNote: v });
+    return true;
+  });
+  const curfewField = useSavedField(listing.curfew ?? "", (v) => {
+    save({ curfew: v });
+    return true;
+  });
+
+  const rentField = useSavedNumberField(listing.rent, (v) => {
+    if (v !== null) save({ rent: v });
+  }, false);
+  const depositMonthsField = useSavedNumberField(listing.depositMonths, (v) => {
+    if (v !== null) save({ depositMonths: v });
+  }, false);
+  const advanceMonthsField = useSavedNumberField(listing.advanceMonths, (v) => {
+    if (v !== null) save({ advanceMonths: v });
+  }, false);
+
+  const assocDuesField = useSavedNumberField(listing.assocDues, (v) => save({ assocDues: v }));
+  const estUtilitiesField = useSavedNumberField(listing.estUtilities, (v) =>
+    save({ estUtilities: v }),
+  );
+  const estInternetField = useSavedNumberField(listing.estInternet, (v) =>
+    save({ estInternet: v }),
+  );
+  const parkingCostField = useSavedNumberField(listing.parkingCost, (v) =>
+    save({ parkingCost: v }),
+  );
+  const bedsPerRoomField = useSavedNumberField(listing.bedsPerRoom, (v) =>
+    save({ bedsPerRoom: v }),
+  );
+  const bedroomsField = useSavedNumberField(listing.bedrooms, (v) => save({ bedrooms: v }));
+  const bathroomsField = useSavedNumberField(listing.bathrooms, (v) => save({ bathrooms: v }));
+  const floorAreaField = useSavedNumberField(listing.floorArea, (v) => save({ floorArea: v }));
+
+  async function onPublish() {
+    setPublishError(null);
+    try {
+      await publish.mutateAsync(listing.id);
+    } catch (thrown) {
+      setPublishError(
+        thrown instanceof ApiError
+          ? thrown.message
+          : "That didn't publish. Try again.",
+      );
+    }
+  }
+
+  function onLocation(next: { lat: number; lng: number; precision: GeocodePrecision }) {
+    save({ lat: next.lat, lng: next.lng, geocodePrecision: next.precision });
+  }
+
+  const ready = listing.gaps.length === 0;
+
+  return (
+    <div className="space-y-6">
+      <div className="rounded-card border border-line bg-surface p-5 shadow-card sm:p-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <Badge
+                tone={
+                  listing.status === "published"
+                    ? "live"
+                    : listing.status === "archived"
+                      ? "neutral"
+                      : ready
+                        ? "ready"
+                        : "blocked"
+                }
+              >
+                {listing.status === "published"
+                  ? "Live"
+                  : listing.status === "archived"
+                    ? "Archived"
+                    : ready
+                      ? "Ready to publish"
+                      : "Needs work"}
+              </Badge>
+              {update.isPending ? (
+                <span className="text-[0.8125rem] text-ink-faint">Saving…</span>
+              ) : null}
+            </div>
+            <h1 className="mt-2 text-xl font-extrabold tracking-[-0.02em] text-ink">
+              {listing.title}
+            </h1>
+          </div>
+
+          {listing.status !== "published" ? (
+            <Button onClick={() => void onPublish()} disabled={!ready || publish.isPending}>
+              {publish.isPending ? "Publishing…" : "Publish"}
+            </Button>
+          ) : (
+            <Button variant="secondary" onClick={() => archive.mutate(listing.id)}>
+              Archive
+            </Button>
+          )}
+        </div>
+
+        <div className="mt-5 border-t border-line pt-5">
+          <ReadinessStatement gaps={listing.gaps} listingId={listing.id} />
+        </div>
+
+        {publishError ? (
+          <div className="mt-4">
+            <Alert>{publishError}</Alert>
+          </div>
+        ) : null}
+      </div>
+
+      <Section id="description" title="The basics" blurb="What a renter reads first.">
+        <TextField
+          label="Title"
+          name="title"
+          {...titleField}
+          placeholder="Studio near Katipunan"
+        />
+        <TextareaField
+          label="Description"
+          name="description"
+          {...descriptionField}
+          placeholder="What's it like to live here? Be specific about the things a photo can't show."
+          hint="Renters skip listings with nothing to read."
+        />
+        <DateField
+          label="Available from"
+          name="availableFrom"
+          value={listing.availableFrom?.slice(0, 10) ?? ""}
+          onChange={(value) => save({ availableFrom: value === "" ? null : new Date(value) })}
+          hint="So renters can tell if it's free when they need to move."
+        />
+      </Section>
+
+      <Section
+        id="location"
+        title="Where it is"
+        blurb="Commute times are worked out from this pin, so it needs to be the actual building."
+      >
+        <TextField
+          label="Address"
+          name="address"
+          {...addressField}
+        />
+        <div className="grid gap-5 sm:grid-cols-2">
+          <TextField
+            label="Barangay"
+            name="barangay"
+            {...barangayField}
+            placeholder="Loyola Heights"
+            required={false}
+          />
+          <TextField
+            label="City"
+            name="city"
+            {...cityField}
+          />
+        </div>
+
+        <LocationPicker lat={listing.lat} lng={listing.lng} onChange={onLocation} />
+
+        <TextField
+          label="Nearest transit"
+          name="nearestTransit"
+          {...nearestTransitField}
+          placeholder="Katipunan LRT-2, 5 min walk"
+          required={false}
+        />
+        <TextareaField
+          label="Flood risk"
+          name="floodRiskNote"
+          rows={3}
+          {...floodRiskNoteField}
+          placeholder="Never flooded in the last 5 years, including Ulysses."
+          hint="Renters in QC ask. Saying nothing reads worse than saying it floods."
+        />
+      </Section>
+
+      <Section
+        id="rent"
+        title="What it really costs"
+        blurb="Every peso a renter pays each month. This is the number they compare on."
+      >
+        <div className="grid gap-5 sm:grid-cols-2">
+          <NumberField
+            label={perBed ? "Rent per bed" : "Monthly rent"}
+            name="rent"
+            {...rentField}
+            prefix="₱"
+            suffix="/mo"
+          />
+          <NumberField
+            label="Association dues and fees"
+            name="assocDues"
+            {...assocDuesField}
+            prefix="₱"
+            suffix="/mo"
+          />
+        </div>
+
+        <div className="grid gap-5 sm:grid-cols-2">
+          <NumberField
+            label="Deposit"
+            name="depositMonths"
+            {...depositMonthsField}
+            suffix="months"
+          />
+          <NumberField
+            label="Advance"
+            name="advanceMonths"
+            {...advanceMonthsField}
+            suffix="months"
+          />
+        </div>
+
+        <CheckboxField
+          label="Utilities are included in the rent"
+          name="utilitiesIncluded"
+          checked={listing.utilitiesIncluded}
+          onChange={(checked) => save({ utilitiesIncluded: checked })}
+          hint="If they are, renters see ₱0 rather than an unknown."
+        />
+
+        <div className="grid gap-5 sm:grid-cols-2">
+          {!listing.utilitiesIncluded ? (
+            <NumberField
+              label="Estimated utilities"
+              name="estUtilities"
+              {...estUtilitiesField}
+              prefix="₱"
+              suffix="/mo"
+              hint="A typical month, not the best one."
+            />
+          ) : null}
+          <NumberField
+            label="Estimated internet"
+            name="estInternet"
+            {...estInternetField}
+            prefix="₱"
+            suffix="/mo"
+          />
+        </div>
+
+        <CheckboxField
+          label="Parking is available"
+          name="parkingAvailable"
+          checked={listing.parkingAvailable}
+          onChange={(checked) => save({ parkingAvailable: checked })}
+        />
+        {listing.parkingAvailable ? (
+          <NumberField
+            label="Parking cost"
+            name="parkingCost"
+            {...parkingCostField}
+            prefix="₱"
+            suffix="/mo"
+            hint="Leave blank if it's free."
+          />
+        ) : null}
+      </Section>
+
+      <Section id="unit" title="The unit itself">
+        {perBed ? (
+          <div className="grid gap-5 sm:grid-cols-2">
+            <NumberField
+              label="Beds per room"
+              name="bedsPerRoom"
+              {...bedsPerRoomField}
+            />
+            <SelectField
+              label="Bathroom"
+              name="bathroomAccess"
+              value={listing.bathroomAccess ?? "shared"}
+              onChange={(value) =>
+                save({ bathroomAccess: value as "shared" | "private" })
+              }
+              options={[
+                { value: "shared", label: "Shared" },
+                { value: "private", label: "Private" },
+              ]}
+            />
+          </div>
+        ) : (
+          <div className="grid gap-5 sm:grid-cols-2">
+            <NumberField
+              label="Bedrooms"
+              name="bedrooms"
+              {...bedroomsField}
+            />
+            <NumberField
+              label="Bathrooms"
+              name="bathrooms"
+              {...bathroomsField}
+            />
+          </div>
+        )}
+
+        <div className="grid gap-5 sm:grid-cols-2">
+          <NumberField
+            label="Floor area"
+            name="floorArea"
+            {...floorAreaField}
+            suffix="sqm"
+          />
+          <SelectField
+            label="Furnishing"
+            name="furnished"
+            value={listing.furnished}
+            onChange={(value) =>
+              save({ furnished: value as "unfurnished" | "semi_furnished" | "fully_furnished" })
+            }
+            options={[
+              { value: "unfurnished", label: "Unfurnished" },
+              { value: "semi_furnished", label: "Semi-furnished" },
+              { value: "fully_furnished", label: "Fully furnished" },
+            ]}
+          />
+        </div>
+      </Section>
+
+      <Section id="rules" title="House rules" blurb="The things renters ask about before viewing.">
+        <CheckboxField
+          label="Pets allowed"
+          name="petsAllowed"
+          checked={listing.petsAllowed}
+          onChange={(checked) => save({ petsAllowed: checked })}
+        />
+        {perBed ? (
+          <>
+            <SelectField
+              label="Who can stay"
+              name="genderPolicy"
+              value={listing.genderPolicy ?? "any"}
+              onChange={(value) =>
+                save({ genderPolicy: value as "any" | "male_only" | "female_only" })
+              }
+              options={[
+                { value: "any", label: "Anyone" },
+                { value: "male_only", label: "Male only" },
+                { value: "female_only", label: "Female only" },
+              ]}
+            />
+            <TextField
+              label="Curfew"
+              name="curfew"
+              {...curfewField}
+              placeholder="Gate locks at 11pm"
+              required={false}
+            />
+          </>
+        ) : null}
+      </Section>
+
+      <Section id="images" title="Photos" blurb="Listings without photos get skipped.">
+        <PhotoManager listing={listing} />
+      </Section>
+
+      <section className="rounded-card border border-danger-line bg-danger-soft p-5 sm:p-6">
+        <h2 className="text-lg font-extrabold tracking-[-0.02em] text-ink">
+          Delete this listing
+        </h2>
+        <p className="mt-1 max-w-prose text-[0.875rem] leading-snug text-ink-soft">
+          Deleting removes the unit and its photos for good. If you just want it
+          off the market, archive it instead — you keep everything and can
+          relist next vacancy.
+        </p>
+        <Button
+          variant="secondary"
+          className="mt-4"
+          onClick={() => setConfirmingDelete(true)}
+        >
+          Delete listing
+        </Button>
+      </section>
+
+      <ConfirmDialog
+        open={confirmingDelete}
+        title="Delete this listing?"
+        body={
+          <>
+            <strong className="text-ink">{listing.title}</strong> and its{" "}
+            {listing.images.length}{" "}
+            {listing.images.length === 1 ? "photo" : "photos"} will be gone for
+            good. Archiving keeps everything instead.
+          </>
+        }
+        confirmLabel="Delete for good"
+        pending={destroy.isPending}
+        onCancel={() => setConfirmingDelete(false)}
+        onConfirm={() => {
+          destroy.mutate(listing.id, {
+            onSuccess: () => router.push("/landlord"),
+          });
+        }}
+      />
+    </div>
+  );
+}

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useMemo, useState } from "react";
 
+import type { SessionResponse } from "@homematch/shared";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { PasswordField, TextField } from "@/components/ui/Field";
@@ -11,6 +12,7 @@ import { login } from "@/features/auth/api/auth.api";
 import { AuthHeading } from "@/features/auth/components/AuthHeading";
 import { useZodForm } from "@/features/auth/hooks/useZodForm";
 import { loginSchema } from "@/features/auth/schemas/auth.schemas";
+import { homeFor } from "@/lib/site";
 
 export function LoginForm() {
   const router = useRouter();
@@ -19,12 +21,20 @@ export function LoginForm() {
 
   const values = useMemo(() => ({ email, password }), [email, password]);
 
-  const onSuccess = useCallback(() => {
-    // The session cookie is set by the API; nothing to store client-side.
-    // `refresh()` clears cached server-rendered output for the old session.
-    router.push("/dashboard");
-    router.refresh();
-  }, [router]);
+  const onSuccess = useCallback(
+    (session: SessionResponse) => {
+      // The session cookie is set by the API; nothing to store client-side.
+      // `refresh()` clears cached server-rendered output for the old session.
+      //
+      // Routed from the returned role rather than always sending everyone to
+      // /dashboard: that page redirects landlords anyway, and bouncing through
+      // it costs a second navigation on the slow connection this product
+      // assumes. /dashboard stays the safety net for every other entry point.
+      router.push(homeFor(session.user.role));
+      router.refresh();
+    },
+    [router],
+  );
 
   const { errors, formError, pending, formRef, handleSubmit } = useZodForm({
     schema: loginSchema,

@@ -19,6 +19,7 @@ model User {
   refreshTokens       RefreshToken[]
   verificationTokens  VerificationToken[]
   passwordResetTokens PasswordResetToken[]
+  listings            Listing[]
 
   @@map("users")
 }
