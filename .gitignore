@@ -9,3 +9,7 @@ dist
 !.env.example
 
 context
+
+# local tooling state (design skill cache, browser automation output)
+.impeccable
+.playwright-mcp
