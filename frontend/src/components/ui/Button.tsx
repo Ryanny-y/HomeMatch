@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { ComponentPropsWithoutRef, ReactNode } from "react";
 
-type Variant = "primary" | "secondary" | "gold" | "onDark";
+type Variant = "primary" | "secondary" | "gold" | "onDark" | "danger";
 type Size = "md" | "lg";
 
 /**
@@ -24,6 +24,9 @@ const variants: Record<Variant, string> = {
     "border border-line-strong bg-surface text-ink hover:border-brand hover:text-brand",
   gold: "bg-gold text-ink hover:bg-gold-ink hover:text-white",
   onDark: "bg-white text-brand-deep hover:bg-gold hover:text-ink",
+  // Confirmation inside a dialog the user already opened deliberately — never
+  // the resting state of a delete control, which stays secondary until asked.
+  danger: "bg-danger text-white hover:bg-danger/90",
 };
 
 const sizes: Record<Size, string> = {

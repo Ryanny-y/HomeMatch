@@ -6,15 +6,22 @@
    Palette follows the Real Estate/Property recommendation from the UI/UX
    database: trust blue primary, gold accent, near-white ground, white cards.
 
-   THE COLOUR CONTRACT — four roles. Anything that is not one of them is
+   THE COLOUR CONTRACT — five roles. Anything that is not one of them is
    neutral ink, and that is not an oversight.
 
      1. BRAND BLUE   action and navigation. Buttons, links, focus rings.
      2. THE SIX CAT  identify a cost line. `CompositionBar` and `StatementRow`,
         HUES         and nowhere else on the page.
-     3. GOLD         the match score, and the honest half of an answer — the
-                     tradeoffs in `CriteriaList`.
+     3. GOLD         the match score, the honest half of an answer — the
+                     tradeoffs in `CriteriaList` — and work still owed.
      4. DANGER       the gap between advertised rent and true cost. Once.
+     5. LIVE         a listing renters can actually see. Publication state only,
+                     added with the landlord dashboard.
+
+   Role 5 was added rather than reusing brand, because a status pill in the
+   action colour reads as a button, and gold already means "not finished". It
+   earns its place by naming the one binary the dashboard exists to move a
+   listing across: visible to renters, or not.
 
    Rule 2 is the one that costs discipline. This product's whole claim is that
    its numbers can be checked, and the six hues are how a number says which
@@ -74,6 +81,12 @@
   --color-danger: #dc2626;
   --color-danger-soft: #fef2f2;
   --color-danger-line: #fecaca;
+
+  /* Role 5. `live-ink` on `live-soft` is 7.4:1; the plain `live` is fill-only. */
+  --color-live: #059669;
+  --color-live-ink: #047857;
+  --color-live-soft: #ecfdf5;
+  --color-live-line: #a7f3d0;
 
   --radius-card: 0.875rem;
   --radius-chip: 0.5rem;
