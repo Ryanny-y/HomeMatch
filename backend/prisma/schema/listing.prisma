@@ -1,0 +1,168 @@
+enum PropertyType {
+  condo
+  apartment
+  boarding_house
+}
+
+enum ListingType {
+  whole_unit
+  bedspace
+}
+
+enum ListingStatus {
+  draft
+  published
+  archived
+}
+
+enum Furnished {
+  unfurnished
+  semi_furnished
+  fully_furnished
+}
+
+enum BathroomAccess {
+  shared
+  private
+}
+
+enum GenderPolicy {
+  any
+  male_only
+  female_only
+}
+
+enum GeocodePrecision {
+  rooftop
+  street
+  barangay
+  approximate
+}
+
+model Listing {
+  id   String @id @default(uuid()) @db.Uuid
+  slug String @unique
+
+  ownerId String @db.Uuid
+  owner   User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  status ListingStatus @default(draft)
+
+  title       String
+  description String?
+
+  propertyType PropertyType
+  listingType  ListingType  @default(whole_unit)
+
+  address   String
+  barangay  String?
+  city      String  @default("Quezon City")
+  province  String?
+
+  lat Float?
+  lng Float?
+
+  geocodeProvider  String?
+  externalPlaceId  String?
+  geocodePrecision GeocodePrecision?
+  geocodedAt       DateTime?
+
+  nearestTransit  String?
+  walkabilityNote String?
+  floodRiskNote   String?
+
+  /// Null for a bedspace, where the unit of sale is a bed rather than a room.
+  bedrooms  Int?
+  bathrooms Int?
+
+  /// The bedspace equivalents. Kept as separate columns rather than reusing
+  /// bedrooms/bathrooms, so no field means two different things depending on a
+  /// sibling.
+  bedsPerRoom    Int?
+  bathroomAccess BathroomAccess?
+
+  floorArea   Decimal?  @db.Decimal(8, 2)
+  furnished   Furnished @default(unfurnished)
+  floorLevel  Int?
+  totalFloors Int?
+
+  rent          Decimal @db.Decimal(12, 2)
+  depositMonths Int     @default(1)
+  advanceMonths Int     @default(1)
+
+  utilitiesIncluded Boolean  @default(false)
+  estUtilities      Decimal? @db.Decimal(12, 2)
+  estInternet       Decimal? @db.Decimal(12, 2)
+  assocDues         Decimal? @db.Decimal(12, 2)
+  otherFees         Decimal? @db.Decimal(12, 2)
+  parkingAvailable  Boolean  @default(false)
+  parkingCost       Decimal? @db.Decimal(12, 2)
+
+  petsAllowed  Boolean       @default(false)
+  curfew       String?
+  genderPolicy GenderPolicy?
+
+  /// Matched against the renter profile's move-in date by the Stage 4 score.
+  availableFrom DateTime?
+
+  publishedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  images   ListingImage[]
+  commutes ListingCommute[]
+
+  @@index([ownerId])
+  @@index([status])
+  @@index([barangay])
+  @@index([rent])
+  @@index([propertyType])
+  @@index([listingType])
+  @@index([availableFrom])
+  @@map("listings")
+}
+
+model ListingImage {
+  id String @id @default(uuid()) @db.Uuid
+
+  listingId String  @db.Uuid
+  listing   Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  /// Object key, not a URL. The bucket and endpoint differ between MinIO and
+  /// production S3, so storing a full URL would bake the environment into rows.
+  storageKey String @unique
+
+  isPrimary Boolean @default(false)
+  order     Int     @default(0)
+
+  createdAt DateTime @default(now())
+
+  @@index([listingId])
+  @@map("listing_images")
+}
+
+/// Travel time from a listing to a known anchor, computed and cached.
+///
+/// Ships empty. A routing job populates it in Stage 4 against the canonical QC
+/// anchors; nothing writes here yet. Precomputed rather than resolved on demand
+/// so "under 30 minutes to UP" can be a SQL filter rather than N API calls.
+model ListingCommute {
+  id String @id @default(uuid()) @db.Uuid
+
+  listingId String  @db.Uuid
+  listing   Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  anchorKey      String
+  minutesDrive   Int?
+  minutesTransit Int?
+
+  /// Which provider produced these figures. No routing engine models jeepneys,
+  /// so a transit estimate here is a car-biased approximation and has to be
+  /// shown with its source rather than presented as fact.
+  source     String
+  computedAt DateTime @default(now())
+
+  @@unique([listingId, anchorKey])
+  @@index([listingId])
+  @@map("listing_commutes")
+}

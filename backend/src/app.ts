@@ -9,6 +9,7 @@ import { prisma } from "./lib/prisma";
 import { ok, fail } from "./shared/response/envelope";
 import { ERROR_CODES } from "@homematch/shared";
 import { authRouter } from "./features/auth/auth.routes";
+import { listingsRouter } from "./features/listings/listings.routes";
 import { originCheck } from "./shared/middleware/originCheck";
 import { errorHandler, notFoundHandler } from "./shared/middleware/errorHandler";
 
@@ -75,6 +76,7 @@ export function createApp(): Express {
   });
 
   app.use("/api/auth", authRouter);
+  app.use("/api/listings", listingsRouter);
 
   // Order is load-bearing: unmatched routes 404, then every error — thrown or
   // rejected — funnels through the one handler. Both must come last.
