@@ -42,11 +42,11 @@ export type GeocodePrecision = z.infer<typeof geocodePrecisionSchema>;
 // -------------------------------------------------------------------- cost ---
 
 /**
- * The four lines a true monthly cost resolves to.
+ * The three lines a true monthly cost resolves to.
  *
  * Bound to `--color-cat-*` tokens under the colour contract in `globals.css`,
  * which still defines six because the landing page's illustrative breakdown
- * uses all six. A live listing resolves to these four: `other` takes
+ * uses all six. A live listing resolves to these three: `other` takes
  * `--color-cat-dues`.
  *
  * Association dues, utilities, and internet were separate lines and separate
@@ -54,7 +54,7 @@ export type GeocodePrecision = z.infer<typeof geocodePrecisionSchema>;
  * as one number cost more than the itemisation was worth, so they collapse into
  * `other`.
  */
-export const COST_CATEGORIES = ["rent", "parking", "other", "movein"] as const;
+export const COST_CATEGORIES = ["rent", "parking", "other"] as const;
 
 export type CostCategory = (typeof COST_CATEGORIES)[number];
 
@@ -63,20 +63,8 @@ export type CostLine = {
   amount: number;
 };
 
-/**
- * The window a move-in payment is spread over to reach a monthly figure.
- *
- * PH rentals quote deposit and advance as multiples of rent, paid once. Showing
- * that as a lump sum makes a listing look unaffordable; hiding it makes the
- * monthly figure a lie. Amortising over a year is the honest middle, and it is
- * named here because the headline number depends on it.
- */
-export const MOVEIN_AMORTIZATION_MONTHS = 12;
-
 export type CostInput = {
   rent: number;
-  depositMonths: number;
-  advanceMonths: number;
   otherFees: number | null;
   parkingAvailable: boolean;
   parkingCost: number | null;
@@ -88,20 +76,31 @@ export type CostInput = {
  * Deterministic by design — PRODUCT.md puts anything scored or priced in rules,
  * never in an LLM. Lines with no cost are omitted rather than shown as zero, so
  * the breakdown reflects what this unit charges rather than a fixed template.
+ *
+ * **Deposit and advance are deliberately absent.** They used to be amortised
+ * over twelve months and folded in here, which made a ₱5,000 unit report ₱6,450
+ * "per month" — a figure the landlord never typed, under a label that gave no
+ * hint it had been derived. A one-time payment does not belong in a monthly
+ * number however it is spread; the move-in total is a real cost, so it is shown
+ * as its own figure rather than blended into this one. Do not add it back.
  */
 export function computeTrueMonthlyCost(input: CostInput): CostLine[] {
-  const moveIn =
-    (input.rent * (input.depositMonths + input.advanceMonths)) /
-    MOVEIN_AMORTIZATION_MONTHS;
-
   const candidates: CostLine[] = [
     { category: "rent", amount: input.rent },
     { category: "parking", amount: input.parkingAvailable ? (input.parkingCost ?? 0) : 0 },
     { category: "other", amount: input.otherFees ?? 0 },
-    { category: "movein", amount: moveIn },
   ];
 
   return candidates.filter((line) => line.amount > 0);
+}
+
+/** What a renter hands over before moving in. Never part of a monthly figure. */
+export function moveInTotal(input: {
+  rent: number;
+  depositMonths: number;
+  advanceMonths: number;
+}): number {
+  return input.rent * (input.depositMonths + input.advanceMonths);
 }
 
 export function totalMonthlyCost(lines: CostLine[]): number {

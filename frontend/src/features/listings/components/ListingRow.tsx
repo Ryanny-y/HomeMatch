@@ -3,8 +3,8 @@
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { computeTrueMonthlyCost, totalMonthlyCost } from "@homematch/shared";
-import { PiImageSquare } from "react-icons/pi";
+import { computeTrueMonthlyCost, moveInTotal, totalMonthlyCost } from "@homematch/shared";
+import { PiCaretDown, PiImageSquare } from "react-icons/pi";
 import { Badge } from "@/components/ui/Badge";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/Dialog";
@@ -13,6 +13,7 @@ import type { Listing } from "@/features/listings/api/listings.api";
 import { useArchiveListing, usePublishListing } from "@/features/listings/hooks/useListings";
 import { STATUS_LABEL, statusOf } from "@/features/listings/listing-status";
 import type { UnitStatus } from "@/features/listings/listing-status";
+import { CostBreakdown } from "./CostBreakdown";
 import { ReadinessStatement } from "./ReadinessStatement";
 
 const TYPE_LABEL: Record<string, string> = {
@@ -75,15 +76,15 @@ export function ListingRow({ listing }: { listing: Listing }) {
 
   const cost = computeTrueMonthlyCost({
     rent: listing.rent,
-    depositMonths: listing.depositMonths,
-    advanceMonths: listing.advanceMonths,
     otherFees: listing.otherFees,
     parkingAvailable: listing.parkingAvailable,
     parkingCost: listing.parkingCost,
   });
 
   const cover = listing.images.find((image) => image.isPrimary) ?? listing.images[0];
-  const unit = listing.listingType === "bedspace" ? "per bed" : "per month";
+  // Only a bedspace needs a unit stated; "per month" under a label already
+  // reading TRUE MONTHLY says the same thing twice.
+  const unit = listing.listingType === "bedspace" ? "per bed" : undefined;
   const editHref = `/landlord/listings/${listing.id}/edit`;
   const canGoLive = listing.gaps.length === 0 && listing.status !== "published";
 
@@ -133,6 +134,37 @@ export function ListingRow({ listing }: { listing: Listing }) {
           />
         </div>
       </div>
+
+      {/* The total is checkable rather than asserted. A landlord who cannot see
+          the lines cannot tell a surprising figure from a wrong one. */}
+      <details className="disclosure group mt-3">
+        <summary className="inline-flex min-h-8 cursor-pointer list-none items-center gap-1.5 rounded-chip text-[0.8125rem] font-semibold text-brand hover:text-brand-dark">
+          <PiCaretDown
+            aria-hidden
+            className="h-3.5 w-3.5 transition-transform duration-200 group-open:rotate-180"
+          />
+          What makes up {peso(totalMonthlyCost(cost))}
+        </summary>
+        <div className="mt-2 rounded-chip bg-surface-sunken p-3.5">
+          <CostBreakdown
+            lines={cost}
+            parkingIncluded={listing.parkingAvailable && !listing.parkingCost}
+          />
+          <p className="mt-3 border-t border-line-strong pt-2.5 text-[0.8125rem] leading-snug text-ink-muted">
+            Deposit and advance are{" "}
+            <strong className="font-semibold text-ink-soft">
+              {peso(
+                moveInTotal({
+                  rent: listing.rent,
+                  depositMonths: listing.depositMonths,
+                  advanceMonths: listing.advanceMonths,
+                }),
+              )}
+            </strong>{" "}
+            paid once, and are not part of the monthly figure.
+          </p>
+        </div>
+      </details>
 
       <div className="mt-3 flex flex-col gap-3 border-t border-line pt-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0 flex-1">

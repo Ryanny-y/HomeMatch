@@ -1,6 +1,11 @@
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import request from "supertest";
-import { computeTrueMonthlyCost, COST_CATEGORIES } from "@homematch/shared";
+import {
+  computeTrueMonthlyCost,
+  COST_CATEGORIES,
+  moveInTotal,
+  totalMonthlyCost,
+} from "@homematch/shared";
 import { app } from "../../../app";
 import { prisma } from "../../../lib/prisma";
 import { ACCESS_COOKIE } from "../../auth/auth.cookies";
@@ -191,14 +196,12 @@ describe("true monthly cost", () => {
   it("emits only categories the colour contract allows", () => {
     const lines = computeTrueMonthlyCost({
       rent: 18000,
-      depositMonths: 2,
-      advanceMonths: 1,
       otherFees: 4300,
       parkingAvailable: true,
       parkingCost: 2500,
     });
 
-    // A fifth line would need a fifth hue and would break the contract
+    // A fourth line would need a fourth hue and would break the contract
     // documented in globals.css.
     for (const line of lines) {
       expect(COST_CATEGORIES).toContain(line.category);
@@ -209,8 +212,6 @@ describe("true monthly cost", () => {
   it("carries other fees as their own line", () => {
     const lines = computeTrueMonthlyCost({
       rent: 10000,
-      depositMonths: 0,
-      advanceMonths: 0,
       otherFees: 800,
       parkingAvailable: false,
       parkingCost: null,
@@ -224,8 +225,6 @@ describe("true monthly cost", () => {
     // rather than a fixed template with blanks in it.
     const lines = computeTrueMonthlyCost({
       rent: 10000,
-      depositMonths: 0,
-      advanceMonths: 0,
       otherFees: null,
       parkingAvailable: false,
       parkingCost: null,
@@ -234,20 +233,28 @@ describe("true monthly cost", () => {
     expect(lines.map((l) => l.category)).toEqual(["rent"]);
   });
 
+  it("keeps deposit and advance out of the monthly figure", () => {
+    // The regression this whole shape exists to prevent. Amortising move-in
+    // over twelve months made a ₱5,000 unit report ₱6,450 "per month" — a
+    // figure the landlord never typed. `moveInTotal` reports it separately.
+    const monthly = { rent: 5000, otherFees: 200, parkingAvailable: false, parkingCost: null };
+
+    expect(totalMonthlyCost(computeTrueMonthlyCost(monthly))).toBe(5200);
+    expect(moveInTotal({ rent: 5000, depositMonths: 2, advanceMonths: 1 })).toBe(15000);
+  });
+
   it("costs a bedspace correctly with no bedrooms", () => {
     // The whole point of listingType: rent is per bed here, and nothing in the
     // maths should depend on a room count.
     const lines = computeTrueMonthlyCost({
       rent: 4500,
-      depositMonths: 1,
-      advanceMonths: 1,
       otherFees: null,
       parkingAvailable: false,
       parkingCost: null,
     });
 
-    expect(lines.map((l) => l.category)).toEqual(["rent", "movein"]);
-    expect(lines.find((l) => l.category === "movein")?.amount).toBe(750);
+    expect(lines.map((l) => l.category)).toEqual(["rent"]);
+    expect(totalMonthlyCost(lines)).toBe(4500);
   });
 });
 

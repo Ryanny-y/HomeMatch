@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { computeTrueMonthlyCost, moveInTotal } from "@homematch/shared";
 import type { GeocodePrecision, UpdateListingInput } from "@homematch/shared";
 import { Alert } from "@/components/ui/Alert";
 import { Badge } from "@/components/ui/Badge";
@@ -15,6 +16,7 @@ import {
   TextareaField,
 } from "@/components/ui/Field";
 import { ApiError } from "@/lib/api";
+import { peso } from "@/lib/format";
 import type { Listing } from "@/features/listings/api/listings.api";
 import {
   useArchiveListing,
@@ -26,6 +28,7 @@ import {
   useSavedField,
   useSavedNumberField,
 } from "@/features/listings/hooks/useSavedField";
+import { CostBreakdown } from "./CostBreakdown";
 import { LocationPicker } from "./LocationPicker";
 import { PhotoManager } from "./PhotoManager";
 import { ReadinessStatement } from "./ReadinessStatement";
@@ -300,6 +303,20 @@ export function EditListingForm({ listing }: { listing: Listing }) {
           />
         </div>
 
+        <p className="text-[0.875rem] leading-snug text-ink-muted">
+          A renter hands over{" "}
+          <strong data-figure className="font-semibold text-ink">
+            {peso(
+              moveInTotal({
+                rent: listing.rent,
+                depositMonths: listing.depositMonths,
+                advanceMonths: listing.advanceMonths,
+              }),
+            )}
+          </strong>{" "}
+          before moving in. Paid once — it is not part of the monthly figure below.
+        </p>
+
         <CheckboxField
           label="Utilities are included in the rent"
           name="utilitiesIncluded"
@@ -324,6 +341,18 @@ export function EditListingForm({ listing }: { listing: Listing }) {
             hint="Leave blank if it's free."
           />
         ) : null}
+
+        <div className="rounded-chip bg-surface-sunken p-4">
+          <CostBreakdown
+            lines={computeTrueMonthlyCost({
+              rent: listing.rent,
+              otherFees: listing.otherFees,
+              parkingAvailable: listing.parkingAvailable,
+              parkingCost: listing.parkingCost,
+            })}
+            parkingIncluded={listing.parkingAvailable && !listing.parkingCost}
+          />
+        </div>
       </Section>
 
       <Section id="unit" title="The unit itself">
