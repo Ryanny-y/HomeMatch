@@ -15,7 +15,11 @@ export const metadata: Metadata = {
 export default function NotFound() {
   return (
     <>
-      <SiteHeader />
+      {/* Deliberately logged-out chrome. The root not-found participates in the
+        static analysis of its sibling routes, so reading cookies here drags
+        /login and /forgot-password out of prerendering with it — measured, not
+        assumed. A stale header on a page nobody stays on is the cheaper wrong. */}
+      <SiteHeader user={null} />
 
       <main id="main" className="flex flex-1 items-center py-20 sm:py-28">
         <Container>

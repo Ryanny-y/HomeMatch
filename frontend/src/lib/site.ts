@@ -1,3 +1,5 @@
+import type { Role } from "@homematch/shared";
+
 /**
  * Single source of truth for anything that appears in more than one place:
  * the wordmark, the nav, the canonical URL used by metadata and JSON-LD.
@@ -37,3 +39,17 @@ export const PRIMARY_NAV: readonly NavLink[] = [
 
 export const SIGNUP_RENTER = "/signup?role=renter";
 export const SIGNUP_LANDLORD = "/signup?role=landlord";
+
+/**
+ * Where each role belongs after signing in.
+ *
+ * One definition because three places need the same answer: the login form
+ * routes with it, `/dashboard` redirects with it, and the header links to it.
+ * Two copies would drift the moment a fourth role or a real admin area lands.
+ *
+ * Admin goes to /landlord because managing listings is what an admin does
+ * today — `/admin` is in the roadmap and does not exist yet.
+ */
+export function homeFor(role: Role): string {
+  return role === "landlord" || role === "admin" ? "/landlord" : "/dashboard";
+}
