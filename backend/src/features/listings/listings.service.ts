@@ -66,16 +66,12 @@ function toDto(row: ListingRow): ListingDto {
     lng: row.lng,
     geocodePrecision: row.geocodePrecision,
 
-    nearestTransit: row.nearestTransit,
     walkabilityNote: row.walkabilityNote,
-    floodRiskNote: row.floodRiskNote,
 
     bedrooms: row.bedrooms,
     bathrooms: row.bathrooms,
     bedsPerRoom: row.bedsPerRoom,
     bathroomAccess: row.bathroomAccess,
-    floorArea: toNullableNumber(row.floorArea),
-    furnished: row.furnished,
     floorLevel: row.floorLevel,
     totalFloors: row.totalFloors,
 
@@ -83,9 +79,6 @@ function toDto(row: ListingRow): ListingDto {
     depositMonths: row.depositMonths,
     advanceMonths: row.advanceMonths,
     utilitiesIncluded: row.utilitiesIncluded,
-    estUtilities: toNullableNumber(row.estUtilities),
-    estInternet: toNullableNumber(row.estInternet),
-    assocDues: toNullableNumber(row.assocDues),
     otherFees: toNullableNumber(row.otherFees),
     parkingAvailable: row.parkingAvailable,
     parkingCost: toNullableNumber(row.parkingCost),
@@ -94,7 +87,6 @@ function toDto(row: ListingRow): ListingDto {
     curfew: row.curfew,
     genderPolicy: row.genderPolicy,
 
-    availableFrom: row.availableFrom?.toISOString() ?? null,
     images: row.images.map(toImageDto),
 
     createdAt: row.createdAt.toISOString(),
@@ -110,10 +102,6 @@ export function gapsFor(row: ListingRow): ReadinessGap[] {
     lng: row.lng,
     barangay: row.barangay,
     rent: toNumber(row.rent),
-    estUtilities: toNullableNumber(row.estUtilities),
-    utilitiesIncluded: row.utilitiesIncluded,
-    estInternet: toNullableNumber(row.estInternet),
-    availableFrom: row.availableFrom,
     imageCount: row.images.length,
   });
 }

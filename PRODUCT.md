@@ -47,9 +47,17 @@ depth, and a renter finds an answer.
 Three mechanisms carry the whole thesis. They must be real and working, because
 they are what a neighboring listing site could not truthfully copy:
 
-- **True Monthly Cost** — rent + parking + utilities + internet + association dues
-  + fees + amortized move-in cost, resolved to one honest itemized number. The
+- **True Monthly Cost** — rent + parking + every other recurring charge, resolved
+  to one honest itemized number, always shown with the lines that make it up. The
   sharpest and most demonstrable feature.
+
+  **Move-in cost is not part of it.** Deposit and advance were originally
+  amortized over twelve months and folded into the monthly figure, which made a
+  ₱5,000 unit report ₱6,450 "per month" — a number the landlord never entered,
+  under a label that gave no hint it had been derived. A one-time payment does
+  not belong in a monthly number however it is spread. The move-in total is real
+  and still shown, as its own figure. Reverting this reintroduces the exact
+  confusion it was changed to fix.
 - **AI Match Score (hybrid)** — a deterministic rules engine computes 0–100; an LLM
   only writes the plain-language "why," **including the negatives**. Transparency is
   the product, not a nicety.

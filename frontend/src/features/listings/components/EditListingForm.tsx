@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { computeTrueMonthlyCost, moveInTotal } from "@homematch/shared";
 import type { GeocodePrecision, UpdateListingInput } from "@homematch/shared";
 import { Alert } from "@/components/ui/Alert";
 import { Badge } from "@/components/ui/Badge";
@@ -9,13 +10,13 @@ import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/Dialog";
 import {
   CheckboxField,
-  DateField,
   NumberField,
   SelectField,
   TextField,
   TextareaField,
 } from "@/components/ui/Field";
 import { ApiError } from "@/lib/api";
+import { peso } from "@/lib/format";
 import type { Listing } from "@/features/listings/api/listings.api";
 import {
   useArchiveListing,
@@ -27,6 +28,7 @@ import {
   useSavedField,
   useSavedNumberField,
 } from "@/features/listings/hooks/useSavedField";
+import { CostBreakdown } from "./CostBreakdown";
 import { LocationPicker } from "./LocationPicker";
 import { PhotoManager } from "./PhotoManager";
 import { ReadinessStatement } from "./ReadinessStatement";
@@ -119,14 +121,6 @@ export function EditListingForm({ listing }: { listing: Listing }) {
     save({ city: v });
     return true;
   });
-  const nearestTransitField = useSavedField(listing.nearestTransit ?? "", (v) => {
-    save({ nearestTransit: v });
-    return true;
-  });
-  const floodRiskNoteField = useSavedField(listing.floodRiskNote ?? "", (v) => {
-    save({ floodRiskNote: v });
-    return true;
-  });
   const curfewField = useSavedField(listing.curfew ?? "", (v) => {
     save({ curfew: v });
     return true;
@@ -142,13 +136,7 @@ export function EditListingForm({ listing }: { listing: Listing }) {
     if (v !== null) save({ advanceMonths: v });
   }, false);
 
-  const assocDuesField = useSavedNumberField(listing.assocDues, (v) => save({ assocDues: v }));
-  const estUtilitiesField = useSavedNumberField(listing.estUtilities, (v) =>
-    save({ estUtilities: v }),
-  );
-  const estInternetField = useSavedNumberField(listing.estInternet, (v) =>
-    save({ estInternet: v }),
-  );
+  const otherFeesField = useSavedNumberField(listing.otherFees, (v) => save({ otherFees: v }));
   const parkingCostField = useSavedNumberField(listing.parkingCost, (v) =>
     save({ parkingCost: v }),
   );
@@ -157,7 +145,6 @@ export function EditListingForm({ listing }: { listing: Listing }) {
   );
   const bedroomsField = useSavedNumberField(listing.bedrooms, (v) => save({ bedrooms: v }));
   const bathroomsField = useSavedNumberField(listing.bathrooms, (v) => save({ bathrooms: v }));
-  const floorAreaField = useSavedNumberField(listing.floorArea, (v) => save({ floorArea: v }));
 
   async function onPublish() {
     setPublishError(null);
@@ -248,13 +235,6 @@ export function EditListingForm({ listing }: { listing: Listing }) {
           placeholder="What's it like to live here? Be specific about the things a photo can't show."
           hint="Renters skip listings with nothing to read."
         />
-        <DateField
-          label="Available from"
-          name="availableFrom"
-          value={listing.availableFrom?.slice(0, 10) ?? ""}
-          onChange={(value) => save({ availableFrom: value === "" ? null : new Date(value) })}
-          hint="So renters can tell if it's free when they need to move."
-        />
       </Section>
 
       <Section
@@ -283,22 +263,6 @@ export function EditListingForm({ listing }: { listing: Listing }) {
         </div>
 
         <LocationPicker lat={listing.lat} lng={listing.lng} onChange={onLocation} />
-
-        <TextField
-          label="Nearest transit"
-          name="nearestTransit"
-          {...nearestTransitField}
-          placeholder="Katipunan LRT-2, 5 min walk"
-          required={false}
-        />
-        <TextareaField
-          label="Flood risk"
-          name="floodRiskNote"
-          rows={3}
-          {...floodRiskNoteField}
-          placeholder="Never flooded in the last 5 years, including Ulysses."
-          hint="Renters in QC ask. Saying nothing reads worse than saying it floods."
-        />
       </Section>
 
       <Section
@@ -315,11 +279,12 @@ export function EditListingForm({ listing }: { listing: Listing }) {
             suffix="/mo"
           />
           <NumberField
-            label="Association dues and fees"
-            name="assocDues"
-            {...assocDuesField}
+            label="Other monthly costs"
+            name="otherFees"
+            {...otherFeesField}
             prefix="₱"
             suffix="/mo"
+            hint="Association dues, utilities, internet — anything paid monthly on top of rent. Leave blank if there's none."
           />
         </div>
 
@@ -338,33 +303,27 @@ export function EditListingForm({ listing }: { listing: Listing }) {
           />
         </div>
 
+        <p className="text-[0.875rem] leading-snug text-ink-muted">
+          A renter hands over{" "}
+          <strong data-figure className="font-semibold text-ink">
+            {peso(
+              moveInTotal({
+                rent: listing.rent,
+                depositMonths: listing.depositMonths,
+                advanceMonths: listing.advanceMonths,
+              }),
+            )}
+          </strong>{" "}
+          before moving in. Paid once — it is not part of the monthly figure below.
+        </p>
+
         <CheckboxField
           label="Utilities are included in the rent"
           name="utilitiesIncluded"
           checked={listing.utilitiesIncluded}
           onChange={(checked) => save({ utilitiesIncluded: checked })}
-          hint="If they are, renters see ₱0 rather than an unknown."
+          hint="If they aren't, fold a typical month into other monthly costs above."
         />
-
-        <div className="grid gap-5 sm:grid-cols-2">
-          {!listing.utilitiesIncluded ? (
-            <NumberField
-              label="Estimated utilities"
-              name="estUtilities"
-              {...estUtilitiesField}
-              prefix="₱"
-              suffix="/mo"
-              hint="A typical month, not the best one."
-            />
-          ) : null}
-          <NumberField
-            label="Estimated internet"
-            name="estInternet"
-            {...estInternetField}
-            prefix="₱"
-            suffix="/mo"
-          />
-        </div>
 
         <CheckboxField
           label="Parking is available"
@@ -382,6 +341,18 @@ export function EditListingForm({ listing }: { listing: Listing }) {
             hint="Leave blank if it's free."
           />
         ) : null}
+
+        <div className="rounded-chip bg-surface-sunken p-4">
+          <CostBreakdown
+            lines={computeTrueMonthlyCost({
+              rent: listing.rent,
+              otherFees: listing.otherFees,
+              parkingAvailable: listing.parkingAvailable,
+              parkingCost: listing.parkingCost,
+            })}
+            parkingIncluded={listing.parkingAvailable && !listing.parkingCost}
+          />
+        </div>
       </Section>
 
       <Section id="unit" title="The unit itself">
@@ -419,28 +390,6 @@ export function EditListingForm({ listing }: { listing: Listing }) {
             />
           </div>
         )}
-
-        <div className="grid gap-5 sm:grid-cols-2">
-          <NumberField
-            label="Floor area"
-            name="floorArea"
-            {...floorAreaField}
-            suffix="sqm"
-          />
-          <SelectField
-            label="Furnishing"
-            name="furnished"
-            value={listing.furnished}
-            onChange={(value) =>
-              save({ furnished: value as "unfurnished" | "semi_furnished" | "fully_furnished" })
-            }
-            options={[
-              { value: "unfurnished", label: "Unfurnished" },
-              { value: "semi_furnished", label: "Semi-furnished" },
-              { value: "fully_furnished", label: "Fully furnished" },
-            ]}
-          />
-        </div>
       </Section>
 
       <Section id="rules" title="House rules" blurb="The things renters ask about before viewing.">

@@ -21,7 +21,6 @@ export const propertyTypeSchema = z.enum(["condo", "apartment", "boarding_house"
 export const listingTypeSchema = z.enum(["whole_unit", "bedspace"]);
 
 export const listingStatusSchema = z.enum(["draft", "published", "archived"]);
-export const furnishedSchema = z.enum(["unfurnished", "semi_furnished", "fully_furnished"]);
 export const bathroomAccessSchema = z.enum(["shared", "private"]);
 export const genderPolicySchema = z.enum(["any", "male_only", "female_only"]);
 
@@ -36,7 +35,6 @@ export const geocodePrecisionSchema = z.enum([
 export type PropertyType = z.infer<typeof propertyTypeSchema>;
 export type ListingType = z.infer<typeof listingTypeSchema>;
 export type ListingStatus = z.infer<typeof listingStatusSchema>;
-export type Furnished = z.infer<typeof furnishedSchema>;
 export type BathroomAccess = z.infer<typeof bathroomAccessSchema>;
 export type GenderPolicy = z.infer<typeof genderPolicySchema>;
 export type GeocodePrecision = z.infer<typeof geocodePrecisionSchema>;
@@ -44,21 +42,19 @@ export type GeocodePrecision = z.infer<typeof geocodePrecisionSchema>;
 // -------------------------------------------------------------------- cost ---
 
 /**
- * The six lines a true monthly cost resolves to.
+ * The three lines a true monthly cost resolves to.
  *
- * Fixed, and bound to the six `--color-cat-*` tokens under the colour contract
- * in `globals.css`. A seventh category would need a seventh hue and would break
- * that contract, which is why `otherFees` folds into `dues` rather than
- * becoming its own line.
+ * Bound to `--color-cat-*` tokens under the colour contract in `globals.css`,
+ * which still defines six because the landing page's illustrative breakdown
+ * uses all six. A live listing resolves to these three: `other` takes
+ * `--color-cat-dues`.
+ *
+ * Association dues, utilities, and internet were separate lines and separate
+ * inputs. Asking a landlord for three numbers to reach one figure they think of
+ * as one number cost more than the itemisation was worth, so they collapse into
+ * `other`.
  */
-export const COST_CATEGORIES = [
-  "rent",
-  "parking",
-  "utilities",
-  "internet",
-  "dues",
-  "movein",
-] as const;
+export const COST_CATEGORIES = ["rent", "parking", "other"] as const;
 
 export type CostCategory = (typeof COST_CATEGORIES)[number];
 
@@ -67,24 +63,8 @@ export type CostLine = {
   amount: number;
 };
 
-/**
- * The window a move-in payment is spread over to reach a monthly figure.
- *
- * PH rentals quote deposit and advance as multiples of rent, paid once. Showing
- * that as a lump sum makes a listing look unaffordable; hiding it makes the
- * monthly figure a lie. Amortising over a year is the honest middle, and it is
- * named here because the headline number depends on it.
- */
-export const MOVEIN_AMORTIZATION_MONTHS = 12;
-
 export type CostInput = {
   rent: number;
-  depositMonths: number;
-  advanceMonths: number;
-  utilitiesIncluded: boolean;
-  estUtilities: number | null;
-  estInternet: number | null;
-  assocDues: number | null;
   otherFees: number | null;
   parkingAvailable: boolean;
   parkingCost: number | null;
@@ -96,23 +76,31 @@ export type CostInput = {
  * Deterministic by design — PRODUCT.md puts anything scored or priced in rules,
  * never in an LLM. Lines with no cost are omitted rather than shown as zero, so
  * the breakdown reflects what this unit charges rather than a fixed template.
+ *
+ * **Deposit and advance are deliberately absent.** They used to be amortised
+ * over twelve months and folded in here, which made a ₱5,000 unit report ₱6,450
+ * "per month" — a figure the landlord never typed, under a label that gave no
+ * hint it had been derived. A one-time payment does not belong in a monthly
+ * number however it is spread; the move-in total is a real cost, so it is shown
+ * as its own figure rather than blended into this one. Do not add it back.
  */
 export function computeTrueMonthlyCost(input: CostInput): CostLine[] {
-  const moveIn =
-    (input.rent * (input.depositMonths + input.advanceMonths)) /
-    MOVEIN_AMORTIZATION_MONTHS;
-
   const candidates: CostLine[] = [
     { category: "rent", amount: input.rent },
     { category: "parking", amount: input.parkingAvailable ? (input.parkingCost ?? 0) : 0 },
-    // Utilities folded into rent are genuinely ₱0 extra, not unknown.
-    { category: "utilities", amount: input.utilitiesIncluded ? 0 : (input.estUtilities ?? 0) },
-    { category: "internet", amount: input.estInternet ?? 0 },
-    { category: "dues", amount: (input.assocDues ?? 0) + (input.otherFees ?? 0) },
-    { category: "movein", amount: moveIn },
+    { category: "other", amount: input.otherFees ?? 0 },
   ];
 
   return candidates.filter((line) => line.amount > 0);
+}
+
+/** What a renter hands over before moving in. Never part of a monthly figure. */
+export function moveInTotal(input: {
+  rent: number;
+  depositMonths: number;
+  advanceMonths: number;
+}): number {
+  return input.rent * (input.depositMonths + input.advanceMonths);
 }
 
 export function totalMonthlyCost(lines: CostLine[]): number {
@@ -142,10 +130,6 @@ export type ReadinessInput = {
   lng: number | null;
   barangay: string | null;
   rent: number | null;
-  estUtilities: number | null;
-  utilitiesIncluded: boolean;
-  estInternet: number | null;
-  availableFrom: Date | string | null;
   imageCount: number;
 };
 
@@ -165,22 +149,6 @@ export function findReadinessGaps(input: ReadinessInput): ReadinessGap[] {
       field: "rent",
       label: "Monthly rent",
       renterImpact: "Renters can't see what this costs.",
-    });
-  }
-
-  if (!input.utilitiesIncluded && !input.estUtilities) {
-    gaps.push({
-      field: "estUtilities",
-      label: "Estimated utilities",
-      renterImpact: "Renters can't see your true monthly cost.",
-    });
-  }
-
-  if (!input.estInternet) {
-    gaps.push({
-      field: "estInternet",
-      label: "Estimated internet",
-      renterImpact: "Renters can't see your true monthly cost.",
     });
   }
 
@@ -213,14 +181,6 @@ export function findReadinessGaps(input: ReadinessInput): ReadinessGap[] {
       field: "images",
       label: "At least one photo",
       renterImpact: "Renters skip listings with no photos.",
-    });
-  }
-
-  if (!input.availableFrom) {
-    gaps.push({
-      field: "availableFrom",
-      label: "Available from",
-      renterImpact: "Renters can't tell if it's free when they need to move.",
     });
   }
 
@@ -263,16 +223,12 @@ export const updateListingSchema = z.object({
   externalPlaceId: z.string().trim().nullable().optional(),
   geocodePrecision: geocodePrecisionSchema.nullable().optional(),
 
-  nearestTransit: z.string().trim().nullable().optional(),
   walkabilityNote: z.string().trim().nullable().optional(),
-  floodRiskNote: z.string().trim().nullable().optional(),
 
   bedrooms: optionalCount,
   bathrooms: optionalCount,
   bedsPerRoom: optionalCount,
   bathroomAccess: bathroomAccessSchema.nullable().optional(),
-  floorArea: z.number().positive().nullable().optional(),
-  furnished: furnishedSchema.optional(),
   floorLevel: optionalCount,
   totalFloors: optionalCount,
 
@@ -280,9 +236,6 @@ export const updateListingSchema = z.object({
   depositMonths: z.number().int().min(0).max(12).optional(),
   advanceMonths: z.number().int().min(0).max(12).optional(),
   utilitiesIncluded: z.boolean().optional(),
-  estUtilities: optionalMoney,
-  estInternet: optionalMoney,
-  assocDues: optionalMoney,
   otherFees: optionalMoney,
   parkingAvailable: z.boolean().optional(),
   parkingCost: optionalMoney,
@@ -290,8 +243,6 @@ export const updateListingSchema = z.object({
   petsAllowed: z.boolean().optional(),
   curfew: z.string().trim().nullable().optional(),
   genderPolicy: genderPolicySchema.nullable().optional(),
-
-  availableFrom: z.coerce.date().nullable().optional(),
 });
 
 export const listingIdParamSchema = z.object({ id: z.uuid() });
@@ -335,16 +286,12 @@ export type ListingDto = {
   lng: number | null;
   geocodePrecision: GeocodePrecision | null;
 
-  nearestTransit: string | null;
   walkabilityNote: string | null;
-  floodRiskNote: string | null;
 
   bedrooms: number | null;
   bathrooms: number | null;
   bedsPerRoom: number | null;
   bathroomAccess: BathroomAccess | null;
-  floorArea: number | null;
-  furnished: Furnished;
   floorLevel: number | null;
   totalFloors: number | null;
 
@@ -352,9 +299,6 @@ export type ListingDto = {
   depositMonths: number;
   advanceMonths: number;
   utilitiesIncluded: boolean;
-  estUtilities: number | null;
-  estInternet: number | null;
-  assocDues: number | null;
   otherFees: number | null;
   parkingAvailable: boolean;
   parkingCost: number | null;
@@ -363,7 +307,6 @@ export type ListingDto = {
   curfew: string | null;
   genderPolicy: GenderPolicy | null;
 
-  availableFrom: string | null;
   images: ListingImageDto[];
 
   createdAt: string;
