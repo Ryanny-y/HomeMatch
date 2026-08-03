@@ -410,6 +410,16 @@ export function EditListingForm({ listing }: { listing: Listing }) {
             ) : null}
           </div>
         ) : null}
+
+        {/* Renters filter on this, so the wording has to match the checkbox they
+            tick on their own profile — the two are describing one fact. */}
+        <CheckboxField
+          label="Near transit"
+          name="nearTransit"
+          hint="Walking distance to a jeepney, bus, or train."
+          checked={listing.nearTransit}
+          onChange={(checked) => save({ nearTransit: checked })}
+        />
       </Section>
 
       <Section
@@ -537,6 +547,23 @@ export function EditListingForm({ listing }: { listing: Listing }) {
             />
           </div>
         )}
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <CheckboxField
+            label="Furnished"
+            name="furnished"
+            hint="At least a bed and a place to cook."
+            checked={listing.furnished}
+            onChange={(checked) => save({ furnished: checked })}
+          />
+          <CheckboxField
+            label="Aircon"
+            name="aircon"
+            hint="Installed, not just an outlet for one."
+            checked={listing.aircon}
+            onChange={(checked) => save({ aircon: checked })}
+          />
+        </div>
       </Section>
 
       <Section id="rules" title="House rules" blurb="The things renters ask about before viewing.">

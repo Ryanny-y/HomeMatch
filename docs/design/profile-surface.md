@@ -160,10 +160,7 @@ the existing `(shell)` layout. At four fields the whole page now sits close to o
   │  │ [x] Pets allowed      │ │ [ ] Parking included  │ │ [ ] Own bathrm │ │
   │  └───────────────────────┘ └───────────────────────┘ └────────────────┘ │
   │  ┌───────────────────────┐ ┌───────────────────────┐ ┌────────────────┐ │
-  │  │ [ ] Step-free access  │ │ [ ] Furnished         │ │ [x] Near transit│ │
-  │  └───────────────────────┘ └───────────────────────┘ └────────────────┘ │
-  │  ┌───────────────────────┐ ┌───────────────────────┐ ┌────────────────┐ │
-  │  │ [ ] Quiet street      │ │ [ ] Aircon            │ │ [ ] Laundry    │ │
+  │  │ [ ] Furnished         │ │ [x] Near transit      │ │ [ ] Aircon     │ │
   │  └───────────────────────┘ └───────────────────────┘ └────────────────┘ │
   └─────────────────────────────────────────────────────────────────────────┘
 
@@ -379,12 +376,12 @@ Placeholder for the text box: `Near UP Diliman, ground floor, somewhere I can pa
 | `Pets allowed` | `Cats and dogs both count.` |
 | `Parking included` | `A slot with the unit, not street parking.` |
 | `Own bathroom` | `Not shared with another unit.` |
-| `Step-free access` | `No stairs, or a working lift.` |
 | `Furnished` | `At least a bed and a place to cook.` |
 | `Near transit` | `Walking distance to a jeepney, bus, or train.` |
-| `Quiet street` | `Off a main road.` |
 | `Aircon` | `Installed, not just an outlet for one.` |
-| `Laundry area` | `Space to wash and dry in the unit.` |
+
+Each hint is also the landlord's wording for the same field in `EditListingForm`. Both sides
+describe one fact, so a renter ticking "near transit" has to mean what the landlord ticked.
 
 ### Save bar
 
@@ -488,13 +485,40 @@ ran against an empty table, so no data was lost and no reset was needed.
 | `userId` | `String @unique @db.Uuid` | FK → `User`, cascade delete |
 | `budget` | `Decimal? @db.Decimal(12,2)` | compared to true monthly cost, never advertised rent; Decimal because `listings.rent` is |
 | `householdSize` | `Int?` | 1–12 |
-| `wants` | `RenterWant[]` | `pets`, `parking`, `step_free`, `own_bathroom`, `furnished`, `near_transit`, `quiet_street`, `aircon`, `laundry` |
+| `wants` | `RenterWant[]` | `pets`, `parking`, `own_bathroom`, `furnished`, `near_transit`, `aircon` |
 | `otherNeeds` | `String? @db.VarChar(500)` | scored input, not a note |
 
 One flat `RenterWant` list replaced the earlier `RenterRequirement` (disqualifying) and
 `RenterPriority` (weighted) split. Which wants are truly non-negotiable varies per renter and
 per search, and asking someone to declare it up front gets a worse answer than reading it out
 of `otherNeeds` later.
+
+### Every want maps 1:1 to a listing field
+
+This is the invariant that keeps the list short, and the reason it is six values rather than
+nine. A want with nothing on the listing to compare against cannot be scored — it is data the
+product collects and never uses.
+
+| Want | Listing field |
+|---|---|
+| `pets` | `petsAllowed` |
+| `parking` | `parkingAvailable` |
+| `own_bathroom` | `bathroomAccess == private` |
+| `furnished` | `furnished` |
+| `near_transit` | `nearTransit` |
+| `aircon` | `aircon` |
+
+`quiet_street`, `laundry` and `step_free` were removed because nothing on a listing answered
+them. `furnished`, `nearTransit` and `aircon` were added to `Listing` in the same change, in
+migration `20260803223144_align_listing_amenities_with_wants`.
+
+**Adding a want means adding its listing field in the same change.** The enum comment in
+`renter-preference.prisma` says so too, because this is the rule most likely to be broken by
+someone adding "just one more checkbox".
+
+`nearTransit` is a boolean rather than the station name an earlier schema draft carried: the
+want is binary, and a landlord naming the specific stop belongs in `description`, where a
+renter can read it.
 
 ### API
 
@@ -516,7 +540,7 @@ the logic cannot drift.
 ### The future AI step, and what it may not do
 
 `otherNeeds` exists to be read by a later **extraction** step: an LLM turns prose ("somewhere
-quiet near a train") into structured `wants` entries (`quiet_street`, `near_transit`). The
+furnished and near a train") into structured `wants` entries (`furnished`, `near_transit`). The
 deterministic rules engine then does the scoring, exactly as today.
 
 This is the locked hybrid architecture in `CLAUDE.md` and PRODUCT.md, not a workaround for it:

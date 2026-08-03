@@ -1,13 +1,13 @@
+/// Every value maps 1:1 to a Listing column, so adding one here means adding
+/// the listing field in the same change — a want nothing can be compared
+/// against is unscorable.
 enum RenterWant {
   pets
   parking
-  step_free
   own_bathroom
   furnished
   near_transit
-  quiet_street
   aircon
-  laundry
 }
 
 

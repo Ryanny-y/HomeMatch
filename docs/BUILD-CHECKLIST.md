@@ -93,8 +93,10 @@ formally complete regardless of how much of its code exists.
 
 > **The preference fields now exist, and they are deliberately narrower than this roadmap
 > section describes.** `RenterPreference` carries four things: `budget`, `householdSize`, a
-> flat `wants` enum (pets, parking, step-free, own bathroom, furnished, near transit, quiet
-> street, aircon, laundry), and `otherNeeds` free text. See the divergence note below.
+> flat `wants` enum (pets, parking, own bathroom, furnished, near transit, aircon), and
+> `otherNeeds` free text. Every want maps 1:1 to a `Listing` column, which is what keeps the
+> list at six — a want with nothing to compare against cannot be scored. See the divergence
+> notes below.
 >
 > **The page is built too.** `/profile` renders the four fields with per-field validation on
 > blur and one page-level save; `/onboarding` redirects to it, and `homeFor("renter")` now
@@ -246,6 +248,15 @@ collapsed into a single **`otherFees`** field.
 *Why:* the editor asked for more than a landlord will realistically fill in, and three separate
 numbers to reach one figure they think of as one number cost more than the itemisation was
 worth. Stage 2's schema block still lists all of them.
+
+**Amended:** `furnished` and transit are back, as booleans, along with a new `aircon` —
+migration `20260803223144_align_listing_amenities_with_wants`. The original cut stands on its
+own reasoning, but that reasoning was "nothing consumes these and they cost the landlord
+effort". The renter profile's `wants` is now a consumer that did not exist then, and a want with
+no listing field to compare against cannot be scored. A checkbox is also a fraction of the cost
+of the free-text `nearestTransit` that was removed — the station name lives in `description`
+instead. `floodRiskNote`, `estUtilities`, `estInternet`, `assocDues`, `floorArea` and
+`availableFrom` remain cut.
 
 ### The renter profile ships four fields, not nine
 Stage 1 lists "budget, work/school location, transport mode, pets, parking, household size,

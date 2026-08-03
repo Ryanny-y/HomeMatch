@@ -23,17 +23,22 @@ import { z } from "zod";
  * these is truly non-negotiable varies per renter and per search, and asking
  * someone to declare it up front gets a worse answer than reading it out of
  * their own words later.
+ *
+ * **Every value maps 1:1 to a field on `ListingDto`** — `pets` to
+ * `petsAllowed`, `parking` to `parkingAvailable`, `own_bathroom` to
+ * `bathroomAccess`, and the rest to fields of the same name. That is what keeps
+ * the list short: a want with nothing on the listing to compare against cannot
+ * be scored, so it is data the product collects and never uses. `quiet_street`,
+ * `laundry` and `step_free` were removed for exactly that reason. Adding a
+ * value here means adding the listing field in the same change.
  */
 export const renterWantSchema = z.enum([
   "pets",
   "parking",
-  "step_free",
   "own_bathroom",
   "furnished",
   "near_transit",
-  "quiet_street",
   "aircon",
-  "laundry",
 ]);
 
 export type RenterWant = z.infer<typeof renterWantSchema>;

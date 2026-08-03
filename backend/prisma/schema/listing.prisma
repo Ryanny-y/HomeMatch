@@ -56,6 +56,11 @@ model Listing {
   lat Float?
   lng Float?
 
+  /// Scored against the renter's `near_transit` want. Boolean rather than the
+  /// station name it replaces: the want is binary, and a landlord naming the
+  /// specific stop belongs in `description` where it can be read.
+  nearTransit Boolean @default(false)
+
   geocodeProvider  String?
   externalPlaceId  String?
   geocodePrecision GeocodePrecision?
@@ -75,6 +80,10 @@ model Listing {
 
   floorLevel  Int?
   totalFloors Int?
+
+  /// Scored against the renter wants of the same name.
+  furnished Boolean @default(false)
+  aircon    Boolean @default(false)
 
   rent          Decimal @db.Decimal(12, 2)
   depositMonths Int     @default(1)
