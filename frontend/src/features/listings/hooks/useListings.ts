@@ -78,6 +78,15 @@ export function useDeleteListing() {
   });
 }
 
+/**
+ * Not a query: geocoding is a billed action fired at a moment the landlord
+ * chooses, not cached server state to read. Caching it by address would also
+ * hide the case where they fix a typo and expect a fresh lookup.
+ */
+export function useGeocode() {
+  return useMutation({ mutationFn: api.geocodeAddress });
+}
+
 export function useUploadImage(id: string) {
   const write = useListingWriter();
 

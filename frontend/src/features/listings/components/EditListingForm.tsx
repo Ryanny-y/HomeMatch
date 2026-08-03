@@ -1,9 +1,13 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { computeTrueMonthlyCost, moveInTotal } from "@homematch/shared";
-import type { GeocodePrecision, UpdateListingInput } from "@homematch/shared";
+import type {
+  GeocodePrecision,
+  GeocodeResult,
+  UpdateListingInput,
+} from "@homematch/shared";
 import { Alert } from "@/components/ui/Alert";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -21,6 +25,7 @@ import type { Listing } from "@/features/listings/api/listings.api";
 import {
   useArchiveListing,
   useDeleteListing,
+  useGeocode,
   usePublishListing,
   useUpdateListing,
 } from "@/features/listings/hooks/useListings";
@@ -45,6 +50,18 @@ import { ReadinessStatement } from "./ReadinessStatement";
  * fields — and on a flaky mobile connection a single large submit is the thing
  * most likely to lose everything.
  */
+/**
+ * What a non-rooftop match actually means, in the landlord's terms. A geocoder
+ * that only resolved the barangay has put the pin in the middle of it, and the
+ * commute times computed from that would be wrong by streets.
+ */
+const PRECISION_NOTE: Record<GeocodePrecision, string> = {
+  rooftop: "",
+  street: "that's the street, not the building. Drag the pin to the exact door.",
+  barangay: "only the barangay matched. Drag the pin to the building.",
+  approximate: "that's an approximate spot. Drag the pin to the building.",
+};
+
 function Section({
   id,
   title,
@@ -88,6 +105,62 @@ export function EditListingForm({ listing }: { listing: Listing }) {
   }
 
   /**
+   * Address → pin.
+   *
+   * `applied` is the whole design. A landlord who dragged the marker onto a
+   * specific rooftop has told us something no geocoder can match, so once a pin
+   * exists a later address edit *offers* the new coordinates instead of taking
+   * them. Only an unpinned listing is moved automatically.
+   */
+  const geocode = useGeocode();
+  const [match, setMatch] = useState<{ result: GeocodeResult; applied: boolean } | null>(
+    null,
+  );
+  const [target, setTarget] = useState<{ lat: number; lng: number } | null>(null);
+
+  /**
+   * Whether the pin on screen was placed by geocoding rather than by hand.
+   *
+   * "Does a pin exist" is the wrong question, and asking it was a bug: editing
+   * address *and* barangay fires two lookups, and the second one saw the pin the
+   * first had just set, so it offered to move the pin to where it already was.
+   * A pin already present at mount is treated as the landlord's, since there is
+   * no way to know otherwise.
+   */
+  const pinIsGeocoded = useRef(false);
+
+  function applyMatch(result: GeocodeResult) {
+    pinIsGeocoded.current = true;
+    setTarget({ lat: result.lat, lng: result.lng });
+    save({
+      lat: result.lat,
+      lng: result.lng,
+      geocodePrecision: result.precision,
+      geocodeProvider: result.provider,
+      externalPlaceId: result.placeId,
+    });
+  }
+
+  function locate(overrides: { address?: string; barangay?: string } = {}) {
+    const address = (overrides.address ?? listing.address).trim();
+    if (address === "") return;
+
+    const query = [address, overrides.barangay ?? listing.barangay, listing.city]
+      .filter((part) => part && part.trim() !== "")
+      .join(", ");
+
+    geocode.mutate(query, {
+      onSuccess: (result) => {
+        const placedByHand =
+          listing.lat !== null && listing.lng !== null && !pinIsGeocoded.current;
+
+        if (!placedByHand) applyMatch(result);
+        setMatch({ result, applied: !placedByHand });
+      },
+    });
+  }
+
+  /**
    * Every typed field is a local draft that saves when it loses focus.
    *
    * Binding these straight to `listing` and saving per keystroke is what broke
@@ -110,10 +183,12 @@ export function EditListingForm({ listing }: { listing: Listing }) {
   const addressField = useSavedField(listing.address, (v) => {
     if (v.trim() === "") return false;
     save({ address: v });
+    locate({ address: v });
     return true;
   });
   const barangayField = useSavedField(listing.barangay ?? "", (v) => {
     save({ barangay: v });
+    locate({ barangay: v });
     return true;
   });
   const cityField = useSavedField(listing.city, (v) => {
@@ -160,7 +235,18 @@ export function EditListingForm({ listing }: { listing: Listing }) {
   }
 
   function onLocation(next: { lat: number; lng: number; precision: GeocodePrecision }) {
-    save({ lat: next.lat, lng: next.lng, geocodePrecision: next.precision });
+    // Moved by hand, so a later address edit must ask before replacing it. The
+    // provider and place id no longer describe this point, and are cleared
+    // rather than left pointing at somewhere the pin has since left.
+    pinIsGeocoded.current = false;
+    setMatch(null);
+    save({
+      lat: next.lat,
+      lng: next.lng,
+      geocodePrecision: next.precision,
+      geocodeProvider: null,
+      externalPlaceId: null,
+    });
   }
 
   const ready = listing.gaps.length === 0;
@@ -262,7 +348,68 @@ export function EditListingForm({ listing }: { listing: Listing }) {
           />
         </div>
 
-        <LocationPicker lat={listing.lat} lng={listing.lng} onChange={onLocation} />
+        <LocationPicker
+          lat={listing.lat}
+          lng={listing.lng}
+          target={target}
+          pending={geocode.isPending}
+          onChange={onLocation}
+        />
+
+        <div className="flex flex-wrap items-center gap-3">
+          <Button
+            variant="secondary"
+            onClick={() => locate()}
+            disabled={geocode.isPending || listing.address.trim() === ""}
+          >
+            {geocode.isPending ? "Looking…" : "Find address on map"}
+          </Button>
+
+          {geocode.isError ? (
+            <p role="alert" className="text-[0.875rem] text-danger">
+              {geocode.error.message}
+            </p>
+          ) : null}
+        </div>
+
+        {match ? (
+          <div
+            className={`rounded-chip border p-3.5 ${
+              match.applied
+                ? "border-live-line bg-live-soft"
+                : "border-gold-line bg-gold-soft"
+            }`}
+          >
+            <p className="text-[0.875rem] leading-snug text-ink-soft">
+              {match.applied ? "Pin moved to " : "Found "}
+              <strong className="font-semibold text-ink">{match.result.label}</strong>
+              {match.result.precision !== "rooftop" ? (
+                <span className="text-ink-muted">
+                  {" "}
+                  — {PRECISION_NOTE[match.result.precision]}
+                </span>
+              ) : null}
+            </p>
+
+            {/* Never taken automatically: the existing pin was placed by hand,
+                and that outranks a geocoder's guess. */}
+            {!match.applied ? (
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button
+                  onClick={() => {
+                    applyMatch(match.result);
+                    setMatch({ result: match.result, applied: true });
+                  }}
+                >
+                  Move the pin here
+                </Button>
+                <Button variant="secondary" onClick={() => setMatch(null)}>
+                  Keep my pin
+                </Button>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </Section>
 
       <Section

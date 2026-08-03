@@ -121,3 +121,22 @@ export const tokenLimiter = rateLimit({
   legacyHeaders: false,
   handler: handler("Too many attempts. Try again in a few minutes."),
 });
+
+/**
+ * Geocoding, which costs money per call.
+ *
+ * Keyed on the authenticated user rather than IP: the route sits behind
+ * `requireAuth`, so the identity is known, and IP alone would bill one carrier's
+ * whole CGNAT pool as a single landlord — most of this audience is on mobile
+ * data. Falls back to IP only if something upstream skipped the guard.
+ */
+export const geocodeLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: limitFor(60),
+  keyGenerator: (req) => req.auth?.userId ?? ipKeyGenerator(req.ip ?? ""),
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  handler: handler(
+    "That's a lot of address lookups. Wait a few minutes, or drag the pin instead.",
+  ),
+});

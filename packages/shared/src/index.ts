@@ -63,6 +63,9 @@ export type {
   ListingDto,
 } from "./listing";
 
+export { geocodeQuerySchema, geocodeResultSchema, precisionFrom } from "./geocoding";
+export type { GeocodeQuery, GeocodeResult } from "./geocoding";
+
 export type {
   LoginInput,
   SignupInput,

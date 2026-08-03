@@ -54,6 +54,17 @@ const envSchema = z.object({
     .enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"])
     .default("info"),
 
+  /**
+   * Forward geocoding, server-side so the billed token never reaches a browser.
+   *
+   * Optional in every environment, unlike the mail keys. Email is load-bearing —
+   * a deploy that cannot send verification silently accepts signups nobody can
+   * confirm. Geocoding is an assist: without it a landlord still places the pin
+   * by hand, so a missing token costs convenience, not correctness. It is also
+   * why CI needs no new secret to stay green.
+   */
+  MAPBOX_TOKEN: z.string().optional(),
+
   S3_ENDPOINT: z.string().min(1, "S3_ENDPOINT is required"),
   S3_REGION: z.string().min(1).default("us-east-1"),
   S3_BUCKET: z.string().min(1, "S3_BUCKET is required"),
@@ -150,6 +161,17 @@ function loadEnv(): Env {
 
   return {
     ...value,
+    /**
+     * The test suite must never reach a billed provider.
+     *
+     * `.env.test` is loaded with `override: true` but only overrides keys it
+     * actually contains, so a `MAPBOX_TOKEN` in a developer's `.env` otherwise
+     * leaks through `env.ts`'s own `dotenv/config` and the suite starts making
+     * real, charged geocoding calls. That is the same hazard `backend/CLAUDE.md`
+     * names for mail, and it is not something a gitignored file should be
+     * trusted to prevent — so it is enforced here.
+     */
+    MAPBOX_TOKEN: value.NODE_ENV === "test" ? undefined : value.MAPBOX_TOKEN,
     allowedOrigins,
     isProduction: value.NODE_ENV === "production",
     isTest: value.NODE_ENV === "test",
