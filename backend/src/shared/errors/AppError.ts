@@ -74,3 +74,18 @@ export class RateLimitedError extends AppError {
     super(429, ERROR_CODES.RATE_LIMITED, message);
   }
 }
+
+/**
+ * Our side failed, but in a way we anticipated and can describe safely — an
+ * upstream provider timing out, or a key that was never configured.
+ *
+ * Operational on purpose. An unexpected throw still becomes a generic 500 with
+ * its message withheld; this one exists so a caller can be told "address lookup
+ * isn't configured, drag the pin instead" rather than "something went wrong".
+ * Never construct it with a message containing a token, query, or path.
+ */
+export class InternalError extends AppError {
+  constructor(message: string) {
+    super(500, ERROR_CODES.INTERNAL_ERROR, message);
+  }
+}

@@ -54,6 +54,17 @@ const envSchema = z.object({
     .enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"])
     .default("info"),
 
+  /**
+   * Forward geocoding, server-side so the billed token never reaches a browser.
+   *
+   * Optional in every environment, unlike the mail keys. Email is load-bearing —
+   * a deploy that cannot send verification silently accepts signups nobody can
+   * confirm. Geocoding is an assist: without it a landlord still places the pin
+   * by hand, so a missing token costs convenience, not correctness. It is also
+   * why CI needs no new secret to stay green.
+   */
+  MAPBOX_TOKEN: z.string().optional(),
+
   S3_ENDPOINT: z.string().min(1, "S3_ENDPOINT is required"),
   S3_REGION: z.string().min(1).default("us-east-1"),
   S3_BUCKET: z.string().min(1, "S3_BUCKET is required"),

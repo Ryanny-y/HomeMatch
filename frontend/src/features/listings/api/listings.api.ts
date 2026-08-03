@@ -1,5 +1,6 @@
 import type {
   CreateListingInput,
+  GeocodeResult,
   ListingDto,
   ReadinessGap,
   UpdateListingInput,
@@ -97,6 +98,16 @@ export function makeImagePrimary(id: string, imageId: string): Promise<Listing> 
     `/api/listings/${id}/images/${imageId}/primary`,
     {},
   ).then((d) => d.listing);
+}
+
+/**
+ * Address → coordinates, via the API rather than Mapbox directly. The token is
+ * billed per call and stays server-side; see backend/src/features/geocoding.
+ */
+export function geocodeAddress(query: string): Promise<GeocodeResult> {
+  return apiGet<{ result: GeocodeResult }>(
+    `/api/geocode?q=${encodeURIComponent(query)}`,
+  ).then((d) => d.result);
 }
 
 export const listingKeys = {
