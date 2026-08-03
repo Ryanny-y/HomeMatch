@@ -63,6 +63,21 @@ export type {
   ListingDto,
 } from "./listing";
 
+export {
+  renterWantSchema,
+  updateRenterPreferenceSchema,
+  EMPTY_RENTER_PREFERENCE,
+  MAX_BUDGET,
+  MAX_HOUSEHOLD_SIZE,
+  MAX_OTHER_NEEDS_LENGTH,
+  canScoreListings,
+} from "./renter-preference";
+export type {
+  RenterWant,
+  UpdateRenterPreferenceInput,
+  RenterPreferenceDto,
+} from "./renter-preference";
+
 export { geocodeQuerySchema, geocodeResultSchema, precisionFrom } from "./geocoding";
 export type { GeocodeQuery, GeocodeResult } from "./geocoding";
 

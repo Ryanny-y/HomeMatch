@@ -11,6 +11,7 @@ import { ERROR_CODES } from "@homematch/shared";
 import { authRouter } from "./features/auth/auth.routes";
 import { geocodingRouter } from "./features/geocoding/geocoding.routes";
 import { listingsRouter } from "./features/listings/listings.routes";
+import { profileRouter } from "./features/profile/profile.routes";
 import { originCheck } from "./shared/middleware/originCheck";
 import { errorHandler, notFoundHandler } from "./shared/middleware/errorHandler";
 
@@ -78,6 +79,7 @@ export function createApp(): Express {
 
   app.use("/api/auth", authRouter);
   app.use("/api/listings", listingsRouter);
+  app.use("/api/profile", profileRouter);
   app.use("/api/geocode", geocodingRouter);
 
   // Order is load-bearing: unmatched routes 404, then every error — thrown or
