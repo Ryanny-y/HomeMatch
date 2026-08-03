@@ -73,12 +73,13 @@ formally complete regardless of how much of its code exists.
 ### Features
 - [x] Signup / login / logout
 - [x] Role-based route protection (frontend + API)
-- [ ] Editable renter preference profile
+- [ ] Editable renter preference profile — **backend built, UI not**: model, migration and
+      `/api/profile` ship; the page is specced in `docs/design/profile-surface.md`
 - [x] Password hashing, input validation — argon2id, Zod at every boundary
 
 ### Pages
 - [x] `/signup`, `/login`
-- [ ] `/profile` — renter preferences form
+- [ ] `/profile` — renter preferences form — spec and API exist; **no route yet**
 - [x] `/dashboard` router that sends each role to the right home
 - [ ] `/admin` shell (protected) — **no `/admin` route exists**
 - [x] Landlord area shell (protected) — `/landlord`, gated in its layout
@@ -86,12 +87,19 @@ formally complete regardless of how much of its code exists.
 ### Definition of done
 - [x] Three roles work — `renter`, `landlord`, `admin`
 - [x] RBAC enforced on both sides — `requireRole` middleware plus server-component guards
-- [ ] Renter profile saves and reloads — **no profile model in the schema**
+- [x] Renter profile saves and reloads — `RenterPreference` model, `/api/profile` GET + PATCH,
+      asserted end to end in `profile.routes.test.ts`
 - [ ] Deployed
 
-> The preference fields the roadmap lists here — budget, work/school location, transport mode,
-> pets, parking, household size, accessibility, move-in date — do not exist in any form. Stage 4
-> scores a listing *against this profile*, so Stage 4 cannot start until it does.
+> **The preference fields now exist, and they are deliberately narrower than this roadmap
+> section describes.** `RenterPreference` carries four things: `budget`, `householdSize`, a
+> flat `wants` enum (pets, parking, step-free, own bathroom, furnished, near transit, quiet
+> street, aircon, laundry), and `otherNeeds` free text. See the divergence note below.
+>
+> **What is still missing is the UI.** There is no `/profile` route; the page, its three
+> components, and the retirement of `/onboarding` are specced in
+> `docs/design/profile-surface.md` and not built. Until that lands a renter has no way to
+> reach these fields, so the feature row above stays unticked.
 
 ---
 
@@ -234,6 +242,24 @@ collapsed into a single **`otherFees`** field.
 *Why:* the editor asked for more than a landlord will realistically fill in, and three separate
 numbers to reach one figure they think of as one number cost more than the itemisation was
 worth. Stage 2's schema block still lists all of them.
+
+### The renter profile ships four fields, not nine
+Stage 1 lists "budget, work/school location, transport mode, pets, parking, household size,
+accessibility, move-in date, lifestyle prefs". `RenterPreference` carries **`budget`,
+`householdSize`, a flat `wants` enum, and `otherNeeds` free text**. Move-in date, move-in
+flexibility, deposit budget, the geocoded commute anchor, transport mode, and the commute
+ceiling were all built and then removed the same day.
+
+*Why:* HomeMatch is inquiry-led, not booking-led. Asking for a move-in date and a deposit
+figure before the renter has seen a single unit asks them to commit to specifics they do not
+have, and every one of those fields was a row they would leave blank. The two-tier checkbox
+split (disqualifying `requirements` vs weighted `priorities`) collapsed into one list for a
+related reason: which wants are genuinely non-negotiable varies per renter and per search, and
+a later extraction step can read that out of `otherNeeds` better than a renter can declare it
+up front. Location wants — "near UP Diliman" — now live in the renter's own words.
+
+`otherNeeds` is **scored input, not a note.** A future LLM step converts its prose into
+structured `wants`; the deterministic engine still does the scoring, so the hybrid rule holds.
 
 ### Move-in cost left the True Monthly Cost
 Stage 4 specifies "amortized moving cost" as part of the figure. It is no longer included.

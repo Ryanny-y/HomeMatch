@@ -20,6 +20,7 @@ model User {
   verificationTokens  VerificationToken[]
   passwordResetTokens PasswordResetToken[]
   listings            Listing[]
+  renterPreference    RenterPreference?
 
   @@map("users")
 }
