@@ -21,6 +21,28 @@ const FORWARD_URL = "https://api.mapbox.com/search/geocode/v6/forward";
 const QC_PROXIMITY = "121.0437,14.676";
 const COUNTRY = "ph";
 
+/**
+ * Metro Manila, and it is doing more work than it looks.
+ *
+ * Mapbox's forward geocoder answers *something* for almost any input. Without
+ * this box, "zzzqqq nonexistent street xyzzy" matched the literal word "Street"
+ * in South Cotabato — a confident-looking hit ~900km from Quezon City, which is
+ * exactly the silently-wrong pin this feature exists to avoid. Constrained, the
+ * same query returns no features at all and the caller gets an honest "we
+ * couldn't find that".
+ *
+ * PRODUCT.md scopes the product to Quezon City first and Metro Manila after, so
+ * this matches the catalog today. Widen it when the product widens.
+ *
+ * Note what is deliberately *not* here: a `match_code.confidence` filter.
+ * Philippine address coverage is sparse enough that Mapbox returns
+ * `confidence: "low"` and `accuracy: "interpolated"` for genuinely correct QC
+ * addresses, so rejecting low confidence would reject real listings. The
+ * interpolation is instead reported honestly as `street` precision, and the
+ * landlord is asked to drag the pin onto the actual building.
+ */
+const METRO_MANILA_BBOX = "120.88,14.30,121.18,14.82";
+
 /** Only the fields consumed here. Mapbox returns considerably more. */
 type MapboxFeature = {
   properties?: {
@@ -76,6 +98,7 @@ export async function geocode(query: string): Promise<GeocodeResult> {
   url.searchParams.set("q", query);
   url.searchParams.set("country", COUNTRY);
   url.searchParams.set("proximity", QC_PROXIMITY);
+  url.searchParams.set("bbox", METRO_MANILA_BBOX);
   url.searchParams.set("limit", "1");
   // The landlord has finished typing before this fires, so partial-token
   // matching only makes the result fuzzier.

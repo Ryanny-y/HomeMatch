@@ -161,6 +161,17 @@ function loadEnv(): Env {
 
   return {
     ...value,
+    /**
+     * The test suite must never reach a billed provider.
+     *
+     * `.env.test` is loaded with `override: true` but only overrides keys it
+     * actually contains, so a `MAPBOX_TOKEN` in a developer's `.env` otherwise
+     * leaks through `env.ts`'s own `dotenv/config` and the suite starts making
+     * real, charged geocoding calls. That is the same hazard `backend/CLAUDE.md`
+     * names for mail, and it is not something a gitignored file should be
+     * trusted to prevent — so it is enforced here.
+     */
+    MAPBOX_TOKEN: value.NODE_ENV === "test" ? undefined : value.MAPBOX_TOKEN,
     allowedOrigins,
     isProduction: value.NODE_ENV === "production",
     isTest: value.NODE_ENV === "test",

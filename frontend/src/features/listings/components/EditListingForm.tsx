@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { computeTrueMonthlyCost, moveInTotal } from "@homematch/shared";
 import type {
   GeocodePrecision,
@@ -118,7 +118,19 @@ export function EditListingForm({ listing }: { listing: Listing }) {
   );
   const [target, setTarget] = useState<{ lat: number; lng: number } | null>(null);
 
+  /**
+   * Whether the pin on screen was placed by geocoding rather than by hand.
+   *
+   * "Does a pin exist" is the wrong question, and asking it was a bug: editing
+   * address *and* barangay fires two lookups, and the second one saw the pin the
+   * first had just set, so it offered to move the pin to where it already was.
+   * A pin already present at mount is treated as the landlord's, since there is
+   * no way to know otherwise.
+   */
+  const pinIsGeocoded = useRef(false);
+
   function applyMatch(result: GeocodeResult) {
+    pinIsGeocoded.current = true;
     setTarget({ lat: result.lat, lng: result.lng });
     save({
       lat: result.lat,
@@ -139,9 +151,11 @@ export function EditListingForm({ listing }: { listing: Listing }) {
 
     geocode.mutate(query, {
       onSuccess: (result) => {
-        const pinned = listing.lat !== null && listing.lng !== null;
-        if (!pinned) applyMatch(result);
-        setMatch({ result, applied: !pinned });
+        const placedByHand =
+          listing.lat !== null && listing.lng !== null && !pinIsGeocoded.current;
+
+        if (!placedByHand) applyMatch(result);
+        setMatch({ result, applied: !placedByHand });
       },
     });
   }
@@ -221,7 +235,18 @@ export function EditListingForm({ listing }: { listing: Listing }) {
   }
 
   function onLocation(next: { lat: number; lng: number; precision: GeocodePrecision }) {
-    save({ lat: next.lat, lng: next.lng, geocodePrecision: next.precision });
+    // Moved by hand, so a later address edit must ask before replacing it. The
+    // provider and place id no longer describe this point, and are cleared
+    // rather than left pointing at somewhere the pin has since left.
+    pinIsGeocoded.current = false;
+    setMatch(null);
+    save({
+      lat: next.lat,
+      lng: next.lng,
+      geocodePrecision: next.precision,
+      geocodeProvider: null,
+      externalPlaceId: null,
+    });
   }
 
   const ready = listing.gaps.length === 0;
