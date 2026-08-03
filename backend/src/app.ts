@@ -8,6 +8,7 @@ import cors from "cors";
 import { prisma } from "./lib/prisma";
 import { ok, fail } from "./shared/response/envelope";
 import { ERROR_CODES } from "@homematch/shared";
+import { adminRouter } from "./features/admin/admin.routes";
 import { authRouter } from "./features/auth/auth.routes";
 import { geocodingRouter } from "./features/geocoding/geocoding.routes";
 import { listingsRouter } from "./features/listings/listings.routes";
@@ -81,6 +82,7 @@ export function createApp(): Express {
   app.use("/api/listings", listingsRouter);
   app.use("/api/profile", profileRouter);
   app.use("/api/geocode", geocodingRouter);
+  app.use("/api/admin", adminRouter);
 
   // Order is load-bearing: unmatched routes 404, then every error — thrown or
   // rejected — funnels through the one handler. Both must come last.

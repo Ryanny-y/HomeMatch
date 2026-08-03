@@ -111,7 +111,14 @@ export function gapsFor(row: ListingRow): ReadinessGap[] {
 
 export type ListingWithReadiness = ListingDto & { gaps: ReadinessGap[] };
 
-function withReadiness(row: ListingRow): ListingWithReadiness {
+/**
+ * Exported so the admin surface can render a listing without a second mapper.
+ *
+ * Money coercion, image URLs and the readiness rule all live here; a parallel
+ * `toDto` in another feature would drift the moment a column is added, and the
+ * two tables would start disagreeing about the same listing.
+ */
+export function withReadiness(row: ListingRow): ListingWithReadiness {
   return { ...toDto(row), gaps: gapsFor(row) };
 }
 
