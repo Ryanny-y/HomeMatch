@@ -29,13 +29,14 @@ a session doesn't "fix" working code into a half-migration:
 | `src/features/` slices, Zod, throwing API client, PascalCase | **Adopted** |
 | Motion (`motion/react`) for scroll entrances | **Adopted, scoped** — landing page only, via `MotionRoot`. `LazyMotion` + `domAnimation` + `strict`, so `m.*` is the only legal component and `motion.*` throws. State, hover, press, and disclosure stay in CSS. See `components/motion/Reveal.tsx` before adding any reveal. |
 | shadcn/ui primitives | **Deferred** — `components/ui/` holds hand-built primitives on the same token system. Swap is a deliberate, separate task. |
-| TanStack Query | **Deferred** — nothing on the public surface has server state. Adopt with the first authenticated screen. |
+| TanStack Query | **Adopted, scoped to authenticated screens** — the landlord listings feature and the renter profile use `useQuery`/`useMutation` through `providers/QueryProvider`, mounted per route rather than app-wide. The public landing and auth pages still have no server state and no provider. |
 | TanStack Form | **Deferred** — pairs with the shadcn decision. Forms use Zod schemas with local state and a shared submit helper. |
 
 Known deviation: `features/auth/components/VerifyEmailClient.tsx` verifies a
-token from the URL inside `useEffect`, because the request must fire on mount
-and there is no query client yet. It is the first thing to move when TanStack
-Query lands.
+token from the URL inside `useEffect`. It predates TanStack Query and still has
+no provider above it, since `/verify-email` is reached while signed out. Moving
+it means mounting a query client on the auth routes — a deliberate change, not a
+cleanup to slip into unrelated work.
 
 ---
 

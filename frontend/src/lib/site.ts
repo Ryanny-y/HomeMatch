@@ -49,7 +49,12 @@ export const SIGNUP_LANDLORD = "/signup?role=landlord";
  *
  * Admin goes to /landlord because managing listings is what an admin does
  * today — `/admin` is in the roadmap and does not exist yet.
+ *
+ * A renter goes to /profile rather than /dashboard, which is still a ComingSoon
+ * shell. The profile is where a renter's session genuinely starts: nothing gets
+ * scored until it is filled in, so landing them anywhere else asks them to
+ * admire an empty catalog first.
  */
 export function homeFor(role: Role): string {
-  return role === "landlord" || role === "admin" ? "/landlord" : "/dashboard";
+  return role === "landlord" || role === "admin" ? "/landlord" : "/profile";
 }

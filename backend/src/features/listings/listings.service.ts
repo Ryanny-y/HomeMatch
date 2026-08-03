@@ -65,6 +65,7 @@ function toDto(row: ListingRow): ListingDto {
     lat: row.lat,
     lng: row.lng,
     geocodePrecision: row.geocodePrecision,
+    nearTransit: row.nearTransit,
 
     walkabilityNote: row.walkabilityNote,
 
@@ -74,6 +75,8 @@ function toDto(row: ListingRow): ListingDto {
     bathroomAccess: row.bathroomAccess,
     floorLevel: row.floorLevel,
     totalFloors: row.totalFloors,
+    furnished: row.furnished,
+    aircon: row.aircon,
 
     rent: toNumber(row.rent),
     depositMonths: row.depositMonths,

@@ -219,6 +219,7 @@ export const updateListingSchema = z.object({
   province: z.string().trim().nullable().optional(),
   lat: z.number().min(-90).max(90).nullable().optional(),
   lng: z.number().min(-180).max(180).nullable().optional(),
+  nearTransit: z.boolean().optional(),
   geocodeProvider: z.string().trim().nullable().optional(),
   externalPlaceId: z.string().trim().nullable().optional(),
   geocodePrecision: geocodePrecisionSchema.nullable().optional(),
@@ -231,6 +232,8 @@ export const updateListingSchema = z.object({
   bathroomAccess: bathroomAccessSchema.nullable().optional(),
   floorLevel: optionalCount,
   totalFloors: optionalCount,
+  furnished: z.boolean().optional(),
+  aircon: z.boolean().optional(),
 
   rent: z.number().positive().optional(),
   depositMonths: z.number().int().min(0).max(12).optional(),
@@ -285,6 +288,7 @@ export type ListingDto = {
   lat: number | null;
   lng: number | null;
   geocodePrecision: GeocodePrecision | null;
+  nearTransit: boolean;
 
   walkabilityNote: string | null;
 
@@ -294,6 +298,8 @@ export type ListingDto = {
   bathroomAccess: BathroomAccess | null;
   floorLevel: number | null;
   totalFloors: number | null;
+  furnished: boolean;
+  aircon: boolean;
 
   rent: number;
   depositMonths: number;

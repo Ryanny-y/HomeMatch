@@ -192,6 +192,49 @@ describe("money", () => {
   });
 });
 
+describe("amenities scored against renter wants", () => {
+  it("defaults to false rather than null, so an unanswered amenity is a real answer", async () => {
+    const token = await signIn("owner@example.com", "landlord");
+    const listing = (await createDraft(token)).body.data.listing;
+
+    expect(listing.furnished).toBe(false);
+    expect(listing.aircon).toBe(false);
+    expect(listing.nearTransit).toBe(false);
+  });
+
+  it("round-trips the three fields a renter's wants are scored against", async () => {
+    const token = await signIn("owner@example.com", "landlord");
+    const cookie = cookieHeader({ [ACCESS_COOKIE]: token });
+    const id = (await createDraft(token)).body.data.listing.id as string;
+
+    await request(app)
+      .patch(`/api/listings/${id}`)
+      .set("Cookie", cookie)
+      .send({ furnished: true, aircon: true, nearTransit: true });
+
+    const res = await request(app).get(`/api/listings/${id}`).set("Cookie", cookie);
+
+    // Every RenterWant maps 1:1 to a listing field; these three are the ones
+    // added for that. A want with nothing to compare against cannot be scored.
+    expect(res.body.data.listing.furnished).toBe(true);
+    expect(res.body.data.listing.aircon).toBe(true);
+    expect(res.body.data.listing.nearTransit).toBe(true);
+  });
+
+  it("does not block publishing — an amenity is never a readiness gap", async () => {
+    const token = await signIn("owner@example.com", "landlord");
+    const cookie = cookieHeader({ [ACCESS_COOKIE]: token });
+    const id = (await createDraft(token)).body.data.listing.id as string;
+
+    const res = await request(app).get(`/api/listings/${id}`).set("Cookie", cookie);
+    const fields = (res.body.data.listing.gaps as { field: string }[]).map((g) => g.field);
+
+    expect(fields).not.toContain("furnished");
+    expect(fields).not.toContain("aircon");
+    expect(fields).not.toContain("nearTransit");
+  });
+});
+
 describe("true monthly cost", () => {
   it("emits only categories the colour contract allows", () => {
     const lines = computeTrueMonthlyCost({

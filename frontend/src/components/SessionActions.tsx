@@ -6,7 +6,7 @@ import { useState } from "react";
 import type { AuthenticatedUser } from "@homematch/shared";
 import { logout } from "@/features/auth/api/auth.api";
 import { Button, ButtonLink } from "@/components/ui/Button";
-import { SIGNUP_RENTER } from "@/lib/site";
+import { homeFor, SIGNUP_RENTER } from "@/lib/site";
 
 /**
  * The header's right-hand side, which differs by whether anyone is signed in.
@@ -54,7 +54,8 @@ export function SessionActions({
     );
   }
 
-  const home = user.role === "landlord" || user.role === "admin" ? "/landlord" : "/dashboard";
+  const isManager = user.role === "landlord" || user.role === "admin";
+  const home = homeFor(user.role);
 
   async function signOut() {
     setLeaving(true);
@@ -79,7 +80,7 @@ export function SessionActions({
             : "rounded-chip px-3 py-2 text-[0.9375rem] font-medium text-ink-muted transition-colors hover:text-brand-dark"
         }
       >
-        {user.role === "renter" ? "Dashboard" : "Your units"}
+        {isManager ? "Your units" : "Your profile"}
       </Link>
       <Button
         variant="secondary"

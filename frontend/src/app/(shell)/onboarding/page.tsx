@@ -1,19 +1,14 @@
-import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 
-import { ComingSoon } from "@/components/ComingSoon";
-
-export const metadata: Metadata = {
-  title: "Set up your profile",
-  robots: { index: false, follow: false },
-};
-
+/**
+ * Retired in favour of `/profile`.
+ *
+ * This route promised the preference form, and `/profile` now is that form —
+ * its empty state does the first-run job a separate onboarding screen would
+ * have, so two surfaces would be two copies of one set of fields to keep in
+ * sync. The route is kept as a redirect rather than deleted because it has been
+ * linked from copy and may be bookmarked.
+ */
 export default function OnboardingPage() {
-  return (
-    <ComingSoon
-      eyebrow="Profile setup"
-      title="Profile setup is next on the list"
-      description="This is where you'll set your budget, where you work or study, how you get there, and the things you won't compromise on — the profile every match score is calculated against. It isn't built yet, so nothing you enter would be scored."
-      action={{ label: "What gets scored", href: "/#match-score" }}
-    />
-  );
+  redirect("/profile");
 }
