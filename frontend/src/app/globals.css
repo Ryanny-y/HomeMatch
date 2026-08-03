@@ -397,6 +397,16 @@
   }
 }
 
+/* The profile's save bar, which is absent until the first edit. It rises rather
+   than fading so it reads as arriving from the edge of the page it is attached
+   to, and it animates only on entry: it leaves when a save completes, and an
+   exit the user has already committed to is just latency. */
+@utility bar-in {
+  @media (prefers-reduced-motion: no-preference) {
+    animation: rise-in var(--dur-move) var(--ease-arrival) both;
+  }
+}
+
 /* The mobile nav pushes content down rather than covering it, so it has to
    explain where the extra height came from. Entry only — closing is instant,
    because an exit the user has already committed to is just latency. */

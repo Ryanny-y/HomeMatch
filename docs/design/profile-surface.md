@@ -4,7 +4,7 @@ tags:
   - homematch
   - design/surface
   - stage/1
-status: backend-built-ui-pending
+status: built
 stage: 1
 updated: 2026-08-03
 ---
@@ -14,9 +14,12 @@ updated: 2026-08-03
 Layout and wireframe spec for the renter's account and preferences page, plus the schema and
 API that back it.
 
-> **Status.** The **backend is built** — schema, two migrations, `/api/profile`, and 31 tests
-> (§8). The **page and its components are not** (§7). The route `/profile` does not exist yet;
-> §1–7 are the spec the UI gets built from next.
+> **Status: built and working.** Schema, two migrations, `/api/profile`, and 31 backend tests
+> (§8); the page, its components, and the save flow (§3–§7). `/onboarding` now redirects here,
+> and `homeFor("renter")` sends renters here after login.
+>
+> This document stays the record of *why* the page is shaped as it is. Where it and the code
+> disagree, the code is what shipped — see §11 for what changed during the build.
 
 ---
 
@@ -437,9 +440,13 @@ Three, down from seven. `RadioGroupField`, `AnchorChips`, `ProgressLine`, and `S
 are all **no longer needed** — the transport radio, the anchor picker, the nine-line meter, and
 the scoring-role tags went with the fields they served.
 
-All three live in `frontend/src/features/profile/components/`, exported through
-`features/profile/index.ts`. None is generic enough for `src/components/`, which is for
-components with 2+ feature consumers.
+All live in `frontend/src/features/profile/components/`, with `ProfileScreen` as the only
+public export in `features/profile/index.ts`. None is generic enough for `src/components/`,
+which is for components with 2+ feature consumers.
+
+Built alongside them: `IdentityCard`, `WantsGrid`, `ProfileScreen`, the `useProfile` /
+`useSaveProfile` query hooks, and `useProfileDraft`, which owns the draft, the dirty count, and
+validation so the components stay presentational.
 
 ### Design tokens — the colour contract holds
 
@@ -552,15 +559,43 @@ Against `frontend/CLAUDE.md`'s floor, which is non-negotiable:
 
 ## 10. Open decisions
 
-1. **Editing name and email.** Display-only because no API exists. Adding one is a backend
-   decision (email changes need re-verification), not a layout one.
-2. **Retiring `/onboarding`.** Agreed in principle. Whether the route redirects to `/profile`
-   or is deleted outright is a routing call for when the page is built.
-3. **Where `/profile` is linked from.** `SessionActions` currently offers renters `Dashboard`
-   only, and `PRIMARY_NAV` is all landing-page anchors. The profile needs an entry point;
-   which one touches `lib/site.ts`.
-4. **Delete account.** Not in this spec, not in the roadmap, no endpoint. Worth deciding before
+1. **Editing name and email.** Still display-only because no API exists. Adding one is a
+   backend decision (email changes need re-verification), not a layout one.
+2. **Delete account.** Not in this spec, not in the roadmap, no endpoint. Worth deciding before
    public renter access opens.
-5. **Growing the `wants` list.** Nine values today. Adding one is a migration plus a copy line;
+3. **Growing the `wants` list.** Nine values today. Adding one is a migration plus a copy line;
    the list should grow from what renters actually write in `otherNeeds`, once there is enough
    of it to read.
+4. **`/dashboard` for renters.** Now unreachable by normal navigation — `homeFor("renter")`
+   points at `/profile`, so the renter dashboard's `ComingSoon` shell is only seen by someone
+   typing the URL. It should either become a real screen or be removed.
+
+### Resolved during the build
+
+- **`/onboarding`** redirects to `/profile` rather than being deleted, since it has been linked
+  from copy and may be bookmarked.
+- **Entry point:** `homeFor()` in `lib/site.ts` now returns `/profile` for a renter. That is the
+  single definition the login form, the `/dashboard` redirect, and the header all read, so
+  changing it there moved all three at once rather than patching the header alone.
+
+---
+
+## 11. What changed during the build
+
+Where the code diverges from §1–§9, and why.
+
+- **Budget and Household have no group description.** The spec gave every group a line of copy;
+  those two say everything they need in the consequence column, and a sentence above it only
+  repeated the one beside it.
+- **The character counter is hidden until the field has content.** "500 left" over an empty box
+  announces a limit nobody is near.
+- **`Field.tsx` gained an optional `describedBy` prop.** The consequence is rendered outside the
+  field, so it needed a way to become the input's `aria-describedby` target — otherwise the
+  explanation is loose text beside the control rather than part of it. Additive; every existing
+  caller is unaffected.
+- **`globals.css` gained a `bar-in` utility** for the save bar's entrance, alongside the existing
+  `panel-in`. Custom animation goes through `@utility` here, never arbitrary values.
+- **The draft resyncs from the server's response after a save.** `toPayload` trims text the draft
+  still held untrimmed, so anything typed with a trailing space compared unequal forever and the
+  page stayed dirty after a successful save. Found by reading the state flow, then reproduced in
+  the browser and fixed.

@@ -27,7 +27,7 @@ against memory.
 | Stage | Focus | Status | What's blocking it |
 |---|---|---|---|
 | 0 | Foundation & walking skeleton | **Partial** | No Dockerfile, nothing deployed, no README |
-| 1 | Auth, RBAC & user profiles | **Partial** | No renter profile model, no `/admin` |
+| 1 | Auth, RBAC & user profiles | **Partial** | No `/admin`; nothing deployed |
 | 2 | Listings core + media uploads | **Partial** | No public detail page, no seed catalog, photos 403 |
 | 3 | Discovery: search, filter, favorites | **Not started** | — |
 | 4 | AI layer: true cost, match score, comparison | **Started** | True cost done; score and comparison not begun |
@@ -73,13 +73,13 @@ formally complete regardless of how much of its code exists.
 ### Features
 - [x] Signup / login / logout
 - [x] Role-based route protection (frontend + API)
-- [ ] Editable renter preference profile — **backend built, UI not**: model, migration and
-      `/api/profile` ship; the page is specced in `docs/design/profile-surface.md`
+- [x] Editable renter preference profile — model, migration, `/api/profile`, and the page;
+      saves, reloads, and validates on blur
 - [x] Password hashing, input validation — argon2id, Zod at every boundary
 
 ### Pages
 - [x] `/signup`, `/login`
-- [ ] `/profile` — renter preferences form — spec and API exist; **no route yet**
+- [x] `/profile` — renter preferences form; `/onboarding` redirects here
 - [x] `/dashboard` router that sends each role to the right home
 - [ ] `/admin` shell (protected) — **no `/admin` route exists**
 - [x] Landlord area shell (protected) — `/landlord`, gated in its layout
@@ -96,10 +96,14 @@ formally complete regardless of how much of its code exists.
 > flat `wants` enum (pets, parking, step-free, own bathroom, furnished, near transit, quiet
 > street, aircon, laundry), and `otherNeeds` free text. See the divergence note below.
 >
-> **What is still missing is the UI.** There is no `/profile` route; the page, its three
-> components, and the retirement of `/onboarding` are specced in
-> `docs/design/profile-surface.md` and not built. Until that lands a renter has no way to
-> reach these fields, so the feature row above stays unticked.
+> **The page is built too.** `/profile` renders the four fields with per-field validation on
+> blur and one page-level save; `/onboarding` redirects to it, and `homeFor("renter")` now
+> sends renters there after login instead of to the `/dashboard` shell. Design, copy, and the
+> build's divergences from it are recorded in `docs/design/profile-surface.md`.
+>
+> One consequence worth tracking: **`/dashboard` is now unreachable for renters** by normal
+> navigation, so its `ComingSoon` shell is only seen by someone typing the URL. It needs to
+> become a real screen or be removed.
 
 ---
 

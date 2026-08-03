@@ -29,7 +29,29 @@ type BaseProps = {
    */
   onBlur?: () => void;
   onFocus?: () => void;
+  /**
+   * An extra element describing this input, when the explanation is rendered
+   * outside the field — the profile page sets each control's consequence in a
+   * neighbouring column, and it has to be announced with the control rather
+   * than left orphaned beside it.
+   */
+  describedBy?: string;
 };
+
+function describers(options: {
+  error?: string;
+  hint?: string;
+  hintId: string;
+  errorId: string;
+  describedBy?: string;
+}): string | undefined {
+  const ids = [
+    options.error ? options.errorId : options.hint ? options.hintId : null,
+    options.describedBy,
+  ].filter(Boolean);
+
+  return ids.length > 0 ? ids.join(" ") : undefined;
+}
 
 function Describers({
   hint,
@@ -80,6 +102,7 @@ export function TextField({
   inputMode,
   onBlur,
   onFocus,
+  describedBy,
 }: BaseProps & {
   type?: "text" | "email";
   inputMode?: "email" | "text";
@@ -98,7 +121,7 @@ export function TextField({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         aria-invalid={error ? true : undefined}
-        aria-describedby={error ? errorId : hint ? hintId : undefined}
+        aria-describedby={describers({ error, hint, hintId, errorId, describedBy })}
         autoComplete={autoComplete}
         inputMode={inputMode}
         placeholder={placeholder}
@@ -124,6 +147,7 @@ export function PasswordField({
   children,
   onBlur,
   onFocus,
+  describedBy,
 }: BaseProps & {
   /** Slot under the input — used for the strength meter on signup. */
   children?: React.ReactNode;
@@ -144,7 +168,7 @@ export function PasswordField({
           value={value}
           onChange={(event) => onChange(event.target.value)}
           aria-invalid={error ? true : undefined}
-          aria-describedby={error ? errorId : hint ? hintId : undefined}
+          aria-describedby={describers({ error, hint, hintId, errorId, describedBy })}
           autoComplete={autoComplete}
           required={required}
           onBlur={onBlur}
@@ -194,6 +218,7 @@ export function NumberField({
   suffix,
   onBlur,
   onFocus,
+  describedBy,
 }: BaseProps & { prefix?: string; suffix?: string }) {
   const id = useId();
   const hintId = `${id}-hint`;
@@ -219,7 +244,7 @@ export function NumberField({
           value={value}
           onChange={(event) => onChange(event.target.value.replace(/[^\d.]/g, ""))}
           aria-invalid={error ? true : undefined}
-          aria-describedby={error ? errorId : hint ? hintId : undefined}
+          aria-describedby={describers({ error, hint, hintId, errorId, describedBy })}
           placeholder={placeholder}
           required={required}
           onBlur={onBlur}
@@ -255,6 +280,7 @@ export function TextareaField({
   rows = 5,
   onBlur,
   onFocus,
+  describedBy,
 }: BaseProps & { rows?: number }) {
   const id = useId();
   const hintId = `${id}-hint`;
@@ -270,7 +296,7 @@ export function TextareaField({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         aria-invalid={error ? true : undefined}
-        aria-describedby={error ? errorId : hint ? hintId : undefined}
+        aria-describedby={describers({ error, hint, hintId, errorId, describedBy })}
         placeholder={placeholder}
         required={required}
         onBlur={onBlur}
@@ -295,6 +321,7 @@ export function SelectField({
   required = false,
   onBlur,
   onFocus,
+  describedBy,
 }: BaseProps & { options: readonly { value: string; label: string }[] }) {
   const id = useId();
   const hintId = `${id}-hint`;
@@ -309,7 +336,7 @@ export function SelectField({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         aria-invalid={error ? true : undefined}
-        aria-describedby={error ? errorId : hint ? hintId : undefined}
+        aria-describedby={describers({ error, hint, hintId, errorId, describedBy })}
         required={required}
         onBlur={onBlur}
         onFocus={onFocus}
@@ -340,6 +367,7 @@ export function DateField({
   required = false,
   onBlur,
   onFocus,
+  describedBy,
 }: BaseProps) {
   const id = useId();
   const hintId = `${id}-hint`;
@@ -355,7 +383,7 @@ export function DateField({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         aria-invalid={error ? true : undefined}
-        aria-describedby={error ? errorId : hint ? hintId : undefined}
+        aria-describedby={describers({ error, hint, hintId, errorId, describedBy })}
         required={required}
         onBlur={onBlur}
         onFocus={onFocus}
