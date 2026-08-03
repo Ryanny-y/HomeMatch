@@ -27,7 +27,7 @@ against memory.
 | Stage | Focus | Status | What's blocking it |
 |---|---|---|---|
 | 0 | Foundation & walking skeleton | **Partial** | No Dockerfile, nothing deployed, no README |
-| 1 | Auth, RBAC & user profiles | **Partial** | No `/admin`; nothing deployed |
+| 1 | Auth, RBAC & user profiles | **Partial** | Nothing deployed |
 | 2 | Listings core + media uploads | **Partial** | No public detail page, no seed catalog, photos 403 |
 | 3 | Discovery: search, filter, favorites | **Not started** | — |
 | 4 | AI layer: true cost, match score, comparison | **Started** | True cost done; score and comparison not begun |
@@ -81,7 +81,7 @@ formally complete regardless of how much of its code exists.
 - [x] `/signup`, `/login`
 - [x] `/profile` — renter preferences form; `/onboarding` redirects here
 - [x] `/dashboard` router that sends each role to the right home
-- [ ] `/admin` shell (protected) — **no `/admin` route exists**
+- [x] `/admin` shell (protected) — `/admin`, `/admin/users`, `/admin/listings`, gated in its layout
 - [x] Landlord area shell (protected) — `/landlord`, gated in its layout
 
 ### Definition of done
@@ -105,7 +105,13 @@ formally complete regardless of how much of its code exists.
 >
 > One consequence worth tracking: **`/dashboard` is now unreachable for renters** by normal
 > navigation, so its `ComingSoon` shell is only seen by someone typing the URL. It needs to
-> become a real screen or be removed.
+> become a real screen or be removed. The same is now true for landlords and admins, since
+> `homeFor` answers for every role.
+>
+> **`/admin` is built.** Three pages behind `requireRole("admin")` — an overview, a users table
+> with row actions, and an all-owners listings table. `/api/admin` is its backend. The overview
+> deliberately reports counts over rows and no traffic at all; see the divergence note below
+> for why, and `docs/design/admin-surface.md` for the surface.
 
 ---
 
@@ -121,7 +127,8 @@ formally complete regardless of how much of its code exists.
 - [x] `/landlord/listings/new`, `/landlord/listings/:id/edit`
 - [ ] `/listings/:id` — public detail page
 - [x] `/landlord` — manage my listings
-- [ ] `/admin/listings` — seed + manage all
+- [x] `/admin/listings` — manage all; **seeding is not built**, so the "seed" half of this row
+      is still open and tracked by the unticked quick-add above
 
 ### Definition of done
 - [ ] Create a listing with photos → visible on a detail page — creation and upload work; there
@@ -239,6 +246,59 @@ Real work no stage asked for, which would otherwise be invisible above.
 ## Deliberate divergences from the roadmap
 
 Changes made on purpose. Recorded so nobody "fixes" them back.
+
+### shadcn/ui was adopted, but only for `/admin`
+
+`frontend/CLAUDE.md` had shadcn listed as **Deferred**, with hand-built primitives in
+`components/ui/` on the token system. It is now **adopted and scoped**: generated components live
+in `components/shadcn/` and are imported only by `features/admin` and `app/admin`. Everything
+else still uses `components/ui/`.
+
+*Why:* `/admin` needed a table, tabs, pagination, a dropdown menu, a generic dialog and a
+sidebar — six primitives that did not exist — and the requested look was explicitly the shadcn
+dashboard. Building all six by hand to imitate shadcn is the expensive way to arrive at shadcn.
+
+*Why a separate directory, which matters more than it looks:* **NTFS is case-insensitive.**
+`components/ui/` already holds `Button.tsx`, `Badge.tsx`, `Card.tsx` and `Dialog.tsx`; the CLI
+generates `button.tsx`, `badge.tsx`, `card.tsx` and `dialog.tsx`. On Windows those are the same
+four paths, so a default install would have silently overwritten four components the landing,
+auth, landlord and profile screens all import. The directory split makes the collision
+impossible and states the scope in every import path.
+
+Two supporting decisions: shadcn's semantic CSS variables are **aliased onto the existing
+`--color-*` tokens** in `globals.css` rather than given their own slate palette, so colour stays
+defined once and a regenerated component inherits the product's palette unedited. And
+`@custom-variant dark` is kept deliberately — it rebinds `dark:` to a `.dark` ancestor that
+nothing sets, which makes the dark styles baked into generated components inert instead of
+firing on a visitor whose OS is in dark mode.
+
+The generated files are ESLint-ignored, because `shadcn add` overwrites them and a hand-fix
+would not survive. Our code that *uses* them is linted normally.
+
+### `/admin` got real design effort, which `PRODUCT.md` says it should not
+
+`PRODUCT.md:20` says admin tooling "stays utility-grade and should not consume design effort
+that belongs to the other two". `/admin` has a sidebar shell, a validated chart, faceted
+filters and a designed empty/loading state.
+
+*Why:* it was asked for directly, and the shadcn adoption means most of that effort was
+installation rather than design. Recorded because it is a real divergence and the next session
+should not read the polish here as licence to spend the same effort on the next admin screen.
+
+### The admin overview reports rows, not traffic
+
+Stage 5 specifies analytics — views, saves, interest, conversion. The overview page shows none
+of them: account and listing counts, verification share, readiness blocks, published-rent
+range, and two 30-day series built from `createdAt`.
+
+*Why:* there is no event tracking, no aggregation job and no audit log, so none of those
+numbers have a source. `/landlord` already set this precedent for the same reason (see the
+Stage 5 note above), and inventing traction on a product whose claim is that its numbers can be
+checked is the worst possible place to start. Stage 5 stays unticked; when the event substrate
+lands, this page gains the figures honestly.
+
+One consequence: `publishedRent` is `null` rather than `0` when nothing is published, and the
+card says so in words. A zero would read as "the average rent is ₱0".
 
 ### Enrichment fields were cut back
 `nearestTransit`, `floodRiskNote`, `estUtilities`, `estInternet`, `assocDues`, `floorArea`,

@@ -54,8 +54,13 @@ export function SessionActions({
     );
   }
 
-  const isManager = user.role === "landlord" || user.role === "admin";
   const home = homeFor(user.role);
+  const homeLabel =
+    user.role === "admin"
+      ? "Admin"
+      : user.role === "landlord"
+        ? "Your units"
+        : "Your profile";
 
   async function signOut() {
     setLeaving(true);
@@ -80,7 +85,7 @@ export function SessionActions({
             : "rounded-chip px-3 py-2 text-[0.9375rem] font-medium text-ink-muted transition-colors hover:text-brand-dark"
         }
       >
-        {isManager ? "Your units" : "Your profile"}
+        {homeLabel}
       </Link>
       <Button
         variant="secondary"

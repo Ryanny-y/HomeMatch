@@ -1,4 +1,14 @@
 @import "tailwindcss";
+/* Enter/exit keyframes the generated shadcn primitives animate with. */
+@import "tw-animate-css";
+
+/* Keep this. It is what makes the generated shadcn components light-only.
+   Tailwind 4's stock `dark:` follows `prefers-color-scheme`, so without this
+   line every `dark:` utility baked into those components would fire on a
+   visitor whose OS is in dark mode — half-dark chrome on an app that declares
+   `color-scheme: light` everywhere else. Rebinding the variant to a `.dark`
+   ancestor that nothing ever sets makes them inert. */
+@custom-variant dark (&:is(.dark *));
 
 /* ---------------------------------------------------------------------------
    HomeMatch AI — design tokens
@@ -120,6 +130,106 @@
   /* Labels and eyebrows only — never amounts. See the `[data-figure]` rule. */
   --font-mono: var(--font-jetbrains), var(--font-jakarta), ui-monospace,
     SFMono-Regular, monospace;
+}
+
+/* ---------------------------------------------------------------------------
+   shadcn/ui bridge — /admin only
+
+   shadcn components are written against a fixed set of semantic variables
+   (`--background`, `--primary`, `--muted-foreground`, …). Rather than let its
+   installer write a second slate palette beside the one above, each name is
+   aliased onto the token that already means that thing. The hexes stay defined
+   exactly once, in `@theme`, and a generated component inherits the product's
+   colour without being edited — so re-running the CLI is safe.
+
+   THE COLOUR CONTRACT STILL BINDS. Nothing here maps to a `--color-cat-*` hue:
+   those identify a cost line and are not available as chrome, however
+   convenient a sixth accent would be on a dashboard.
+
+   No `.dark` block. The app is `color-scheme: light` end to end, and a theme
+   only one route honours is worse than no theme at all.
+--------------------------------------------------------------------------- */
+:root {
+  --background: var(--color-canvas);
+  --foreground: var(--color-ink);
+
+  --card: var(--color-surface);
+  --card-foreground: var(--color-ink);
+  --popover: var(--color-surface);
+  --popover-foreground: var(--color-ink);
+
+  --primary: var(--color-brand);
+  --primary-foreground: #ffffff;
+  --secondary: var(--color-surface-sunken);
+  --secondary-foreground: var(--color-ink-soft);
+
+  --muted: var(--color-surface-sunken);
+  --muted-foreground: var(--color-ink-muted);
+  --accent: var(--color-brand-soft);
+  --accent-foreground: var(--color-brand-dark);
+
+  --destructive: var(--color-danger);
+  --destructive-foreground: #ffffff;
+
+  --border: var(--color-line);
+  --input: var(--color-line-strong);
+  --ring: var(--color-brand);
+
+  --radius: var(--radius-card);
+
+  --sidebar: var(--color-surface);
+  --sidebar-foreground: var(--color-ink);
+  --sidebar-primary: var(--color-brand);
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: var(--color-brand-soft);
+  --sidebar-accent-foreground: var(--color-brand-dark);
+  --sidebar-border: var(--color-line);
+  --sidebar-ring: var(--color-brand);
+
+  /* The two series on the overview chart. Brand for people, neutral ink for
+     inventory — deliberately not a categorical palette, because two series
+     that mean different *kinds* of thing should not look like siblings. */
+  --chart-1: var(--color-brand);
+  --chart-2: var(--color-ink-faint);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
 }
 
 @layer base {
@@ -414,4 +524,15 @@
   @media (prefers-reduced-motion: no-preference) {
     animation: panel-drop var(--dur-move) var(--ease-arrival) both;
   }
+}
+
+.dark {
+  --sidebar: hsl(240 5.9% 10%);
+  --sidebar-foreground: hsl(240 4.8% 95.9%);
+  --sidebar-primary: hsl(224.3 76.3% 48%);
+  --sidebar-primary-foreground: hsl(0 0% 100%);
+  --sidebar-accent: hsl(240 3.7% 15.9%);
+  --sidebar-accent-foreground: hsl(240 4.8% 95.9%);
+  --sidebar-border: hsl(240 3.7% 15.9%);
+  --sidebar-ring: hsl(217.2 91.2% 59.8%);
 }

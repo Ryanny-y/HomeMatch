@@ -3,8 +3,9 @@ export type {
   ApiResponse,
   ApiSuccessResponse,
   ApiErrorResponse,
+  PaginationMeta,
 } from "./api-response";
-export { isApiSuccess } from "./api-response";
+export { isApiSuccess, isPaginated } from "./api-response";
 
 export { ERROR_CODES } from "./error-codes";
 export type { ErrorCode } from "./error-codes";

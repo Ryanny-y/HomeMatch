@@ -2,6 +2,7 @@ import type {
   ApiErrorResponse,
   ApiSuccessResponse,
   ErrorCode,
+  PaginationMeta,
 } from "@homematch/shared";
 
 export function ok<T>(
@@ -25,12 +26,7 @@ export function fail(
   };
 }
 
-/** The fixed pagination shape. Do not invent a per-endpoint variant. */
-export type PaginationMeta = {
-  page: number;
-  pageSize: number;
-  total: number;
-};
+export type { PaginationMeta };
 
 export function paginationMeta(
   page: number,

@@ -28,7 +28,7 @@ a session doesn't "fix" working code into a half-migration:
 |---|---|
 | `src/features/` slices, Zod, throwing API client, PascalCase | **Adopted** |
 | Motion (`motion/react`) for scroll entrances | **Adopted, scoped** — landing page only, via `MotionRoot`. `LazyMotion` + `domAnimation` + `strict`, so `m.*` is the only legal component and `motion.*` throws. State, hover, press, and disclosure stay in CSS. See `components/motion/Reveal.tsx` before adding any reveal. |
-| shadcn/ui primitives | **Deferred** — `components/ui/` holds hand-built primitives on the same token system. Swap is a deliberate, separate task. |
+| shadcn/ui primitives | **Adopted, scoped to `/admin`.** Generated components live in `components/shadcn/` and are imported only by `features/admin` and `app/admin`. Everything else keeps the hand-built primitives in `components/ui/`. **The two directories are not interchangeable and must not be merged** — NTFS is case-insensitive, so `components/ui/Button.tsx` and a generated `button.tsx` are the same path, and four working components would be overwritten. shadcn's semantic variables are aliased onto the existing `--color-*` tokens in `globals.css`, so colour is still defined once; do not let the CLI write its own palette. `components/shadcn/**` is ESLint-ignored because `shadcn add` overwrites it. |
 | TanStack Query | **Adopted, scoped to authenticated screens** — the landlord listings feature and the renter profile use `useQuery`/`useMutation` through `providers/QueryProvider`, mounted per route rather than app-wide. The public landing and auth pages still have no server state and no provider. |
 | TanStack Form | **Deferred** — pairs with the shadcn decision. Forms use Zod schemas with local state and a shared submit helper. |
 
