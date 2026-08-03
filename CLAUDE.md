@@ -179,6 +179,8 @@ Applies to both workspaces; the scoped files restate it in their own terms.
 ## GIT / BRANCHING / PR
 
 - **Branch per feature.** Sync `main` (pull latest), then create and switch to a new branch — **never work directly on `main`.**
+- **Branch before the first edit, not before the first commit.** Cutting the branch is the first action of the task, ahead of any file write. Check `git branch --show-current` before editing anything; if the answer is `main`, stop and branch.
+- **If the work changes character mid-branch, cut a new branch.** A `docs/*` branch that starts growing a schema, an API, or a feature slice has become a second unit of work — the prefix is a promise about what the diff contains. Branch again rather than letting the first one absorb it.
 - Branch naming: `feat/<feature>`, `fix/<feature>`, `refactor/<scope>`, `chore/<scope>`, `docs/<scope>` (kebab-case).
 - Commit incrementally as work progresses.
 - **PR only on my approval.** When an implementation is complete, present it and wait. Do NOT open a PR automatically.
