@@ -18,6 +18,12 @@ export function ConfirmDialog({
   title,
   body,
   confirmLabel,
+  /**
+   * Defaults to the wording for a delete, which is what this dialog was built
+   * for. Any other use has to say what cancelling keeps — "Keep it" beside
+   * "Leave without saving?" reads as keeping the listing, not the edit.
+   */
+  cancelLabel = "Keep it",
   pending,
   onConfirm,
   onCancel,
@@ -26,6 +32,7 @@ export function ConfirmDialog({
   title: string;
   body: ReactNode;
   confirmLabel: string;
+  cancelLabel?: string;
   pending?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
@@ -57,7 +64,7 @@ export function ConfirmDialog({
 
         <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <Button variant="secondary" onClick={onCancel} disabled={pending}>
-            Keep it
+            {cancelLabel}
           </Button>
           <Button variant="danger" onClick={onConfirm} disabled={pending}>
             {pending ? "Working…" : confirmLabel}

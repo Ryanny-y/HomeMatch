@@ -6,12 +6,12 @@ import { canScoreListings, MAX_OTHER_NEEDS_LENGTH } from "@homematch/shared";
 import { Alert } from "@/components/ui/Alert";
 import { Card } from "@/components/ui/Card";
 import { NumberField, TextareaField } from "@/components/ui/Field";
+import { SaveBar } from "@/components/ui/SaveBar";
 import { useProfile, useSaveProfile } from "@/features/profile/hooks/useProfile";
 import { useProfileDraft } from "@/features/profile/hooks/useProfileDraft";
 import { IdentityCard } from "./IdentityCard";
 import { RubricGroup } from "./RubricGroup";
 import { RubricRow } from "./RubricRow";
-import { SaveBar } from "./SaveBar";
 import { WantsGrid } from "./WantsGrid";
 
 function Skeleton() {
@@ -212,6 +212,8 @@ function ProfileForm({
         invalidCount={invalidCount}
         saving={save.isPending}
         saved={justSaved && dirtyCount === 0}
+        saveLabel="Save profile"
+        savedLabel="Profile saved."
         onSave={() => form.current?.requestSubmit()}
         onDiscard={reset}
       />

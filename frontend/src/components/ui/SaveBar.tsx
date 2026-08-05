@@ -4,19 +4,25 @@ import { PiCheckCircleFill } from "react-icons/pi";
 import { Button } from "@/components/ui/Button";
 
 /**
- * The page's one authored moment.
+ * The unsaved-work bar, shared by the profile and the listing editor.
  *
  * Absent when nothing is owed rather than present-and-disabled: a permanent bar
  * over the content is a permanent claim on the reader's attention for a state
  * where there is nothing to do. It arrives when the first edit is made, and the
  * confirmation replaces it in place so the eye does not have to move to learn
  * the save worked.
+ *
+ * The two labels are props because the confirmation has to name what was saved
+ * — "Saved." alone reads as a system message rather than an answer to the thing
+ * the person just did.
  */
 export function SaveBar({
   dirtyCount,
   invalidCount,
   saving,
   saved,
+  saveLabel,
+  savedLabel,
   onSave,
   onDiscard,
 }: {
@@ -24,6 +30,10 @@ export function SaveBar({
   invalidCount: number;
   saving: boolean;
   saved: boolean;
+  /** The button's text, e.g. "Save profile". */
+  saveLabel: string;
+  /** The confirmation, e.g. "Profile saved." */
+  savedLabel: string;
   onSave: () => void;
   onDiscard: () => void;
 }) {
@@ -35,7 +45,7 @@ export function SaveBar({
           className="flex items-center gap-2 text-[0.9375rem] font-semibold text-live-ink"
         >
           <PiCheckCircleFill aria-hidden="true" className="h-[1.125rem] w-[1.125rem]" />
-          Profile saved.
+          {savedLabel}
         </p>
       </Bar>
     );
@@ -66,7 +76,7 @@ export function SaveBar({
           Discard
         </Button>
         <Button onClick={onSave} disabled={saving} className="max-sm:flex-1">
-          {saving ? "Saving…" : "Save profile"}
+          {saving ? "Saving…" : saveLabel}
         </Button>
       </div>
     </Bar>
