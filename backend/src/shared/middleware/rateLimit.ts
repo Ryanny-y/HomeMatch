@@ -123,6 +123,28 @@ export const tokenLimiter = rateLimit({
 });
 
 /**
+ * The catalog. Cheap to serve, and the thing renters are here to do.
+ *
+ * Keyed on the authenticated user rather than IP, for the same reason as
+ * geocoding below: the route sits behind `requireAuth`, so the identity is
+ * known, and IP alone would bill one mobile carrier's whole CGNAT pool as a
+ * single renter. Most of this audience is on mobile data.
+ *
+ * Deliberately the loosest limit here. The others stop something expensive or
+ * attackable; this one only stops an account being used to bulk-copy the
+ * catalog. 300 in 15 minutes is a request every three seconds sustained — far
+ * above browsing, far below a scrape worth caring about.
+ */
+export const catalogLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: limitFor(300),
+  keyGenerator: (req) => req.auth?.userId ?? ipKeyGenerator(req.ip ?? ""),
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  handler: handler("That's a lot of requests. Give it a minute and try again."),
+});
+
+/**
  * Geocoding, which costs money per call.
  *
  * Keyed on the authenticated user rather than IP: the route sits behind

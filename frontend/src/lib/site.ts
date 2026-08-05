@@ -29,8 +29,16 @@ export type NavLink = {
   href: string;
 };
 
-/** Header anchors. All resolve to a section on the landing page. */
+/**
+ * The header's main nav — one route and four landing-page anchors.
+ *
+ * `/browse` leads first because it is the only entry to the catalog, and it is
+ * shown to signed-out visitors deliberately even though the page requires an
+ * account: they land on `/login?next=/browse` and arrive at the catalog once
+ * they sign in. That is the funnel, not a dead link.
+ */
 export const PRIMARY_NAV: readonly NavLink[] = [
+  { label: "Browse", href: "/browse" },
   { label: "How it works", href: "/#how-it-works" },
   { label: "Features", href: "/#match-score" },
   { label: "For landlords", href: "/#for-landlords" },
@@ -60,4 +68,33 @@ export function homeFor(role: Role): string {
   if (role === "admin") return "/admin";
 
   return role === "landlord" ? "/landlord" : "/profile";
+}
+
+/**
+ * Where to send someone after they sign in, given a `?next=` we do not trust.
+ *
+ * **This is an open-redirect guard, not tidying.** `next` arrives in a URL that
+ * anyone can compose and send to anyone — the classic attack is a link to our
+ * own login page carrying `?next=https://homematch-ph.example`, which lands a
+ * user who has just typed their password on someone else's site, still
+ * believing they are here. So the value is not sanitised into shape; anything
+ * that is not plainly a path on this site is discarded for the role's home.
+ *
+ * Rejected, and why each matters:
+ *
+ * - `https://evil.ph` — absolute, the obvious case.
+ * - `//evil.ph` — protocol-relative. Browsers treat it as absolute, so a bare
+ *   `startsWith("/")` check passes it straight through. This is the one that
+ *   catches people out.
+ * - `/\evil.ph` — backslash variant, which several browsers normalise to `//`.
+ * - `javascript:…`, `data:…` — caught by the same rule, since a URL carrying a
+ *   scheme cannot begin with `/`.
+ */
+export function safeNext(next: string | undefined, role: Role): string {
+  if (!next) return homeFor(role);
+
+  const isRelativePath =
+    next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/\\");
+
+  return isRelativePath ? next : homeFor(role);
 }
