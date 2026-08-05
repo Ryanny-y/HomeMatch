@@ -1,8 +1,10 @@
 import {
   ERROR_CODES,
   isApiSuccess,
+  isPaginated,
   type ApiResponse,
   type ErrorCode,
+  type PaginationMeta,
 } from "@homematch/shared";
 
 /**
@@ -116,11 +118,11 @@ function refreshSession(): Promise<boolean> {
   return refreshInFlight;
 }
 
-async function request<T>(
+async function send<T>(
   path: string,
   init: RequestInit,
   retryOn401 = true,
-): Promise<T> {
+): Promise<ApiResponse<T>> {
   let response: Response;
 
   try {
@@ -145,7 +147,7 @@ async function request<T>(
     const refreshed = await refreshSession();
 
     if (refreshed) {
-      return request<T>(path, init, false);
+      return send<T>(path, init, false);
     }
   }
 
@@ -160,12 +162,7 @@ async function request<T>(
     throw unreachable();
   }
 
-  if (isApiSuccess(payload)) return payload.data;
-
-  // A success carrying no payload — what forgot-password, reset-password, and
-  // verify-email return. `isApiSuccess` requires non-null data, so it rejects
-  // these; they are still successes.
-  if (payload.success) return undefined as T;
+  if (payload.success) return payload;
 
   const error = payload.error;
 
@@ -174,6 +171,17 @@ async function request<T>(
     error?.message ?? "Something went wrong on our end. Please try again.",
     error?.details,
   );
+}
+
+async function request<T>(path: string, init: RequestInit): Promise<T> {
+  const payload = await send<T>(path, init);
+
+  if (isApiSuccess(payload)) return payload.data;
+
+  // A success carrying no payload — what forgot-password, reset-password, and
+  // verify-email return. `isApiSuccess` requires non-null data, so it rejects
+  // these; they are still successes.
+  return undefined as T;
 }
 
 export function apiPost<T>(path: string, body: unknown): Promise<T> {
@@ -190,6 +198,52 @@ export function apiDelete<T>(path: string): Promise<T> {
 
 export function apiGet<T>(path: string): Promise<T> {
   return request<T>(path, { method: "GET" });
+}
+
+/**
+ * A list endpoint's rows together with its pagination.
+ *
+ * `apiGet` unwraps to `data` and drops `meta`, which is right for every other
+ * call — a pager is the one consumer that needs the envelope's other half.
+ * Throws if `meta` is missing or misshapen rather than defaulting the total to
+ * zero, because a pager silently showing "1 of 1" is worse than a visible error.
+ */
+export async function apiGetPage<T>(
+  path: string,
+): Promise<{ data: T; meta: PaginationMeta }> {
+  const payload = await send<T>(path, { method: "GET" });
+
+  if (!isApiSuccess(payload) || !isPaginated(payload.meta)) {
+    throw new ApiError(
+      ERROR_CODES.INTERNAL_ERROR,
+      "That list came back without its pagination. Please try again.",
+    );
+  }
+
+  return { data: payload.data, meta: payload.meta };
+}
+
+/**
+ * Appends a query string, skipping anything unset.
+ *
+ * `undefined`, `null` and `""` are all dropped rather than serialised, because
+ * `?status=` reaching a Zod schema is a different thing from omitting it — and
+ * a cleared filter should look like no filter, not like an empty one.
+ */
+export function withQuery(
+  path: string,
+  params: Record<string, string | number | boolean | undefined | null>,
+): string {
+  const search = new URLSearchParams();
+
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined || value === null || value === "") continue;
+    search.set(key, String(value));
+  }
+
+  const query = search.toString();
+
+  return query ? `${path}?${query}` : path;
 }
 
 /** Narrows an unknown catch binding to a message the UI can render. */

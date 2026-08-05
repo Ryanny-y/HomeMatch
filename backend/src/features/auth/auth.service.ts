@@ -202,6 +202,18 @@ export async function logout(rawToken: string | undefined): Promise<void> {
   await repo.revokeFamily(row.familyId);
 }
 
+/**
+ * Revokes every live refresh family for one user.
+ *
+ * Exported for the admin surface, which must be able to end someone else's
+ * sessions without reaching into this feature's repository. The access token
+ * they are holding stays valid until it expires — this stops the renewal, which
+ * is the most an opaque-refresh design can promise.
+ */
+export function revokeSessionsFor(userId: string): Promise<{ count: number }> {
+  return repo.revokeAllFamiliesForUser(userId);
+}
+
 export async function getSession(userId: string): Promise<AuthenticatedUser> {
   const user = await repo.findUserById(userId);
 

@@ -1,12 +1,7 @@
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
-import express from "express";
-import cookieParser from "cookie-parser";
 import request from "supertest";
 import { app } from "../../../app";
 import { prisma } from "../../../lib/prisma";
-import { requireAuth, requireRole } from "../../../shared/middleware/requireAuth";
-import { errorHandler } from "../../../shared/middleware/errorHandler";
-import { ok } from "../../../shared/response/envelope";
 import { generateOpaqueToken, hashToken } from "../../../shared/security/token";
 import { ACCESS_COOKIE, REFRESH_COOKIE } from "../auth.cookies";
 import { closeDatabase, resetDatabase } from "../../../../tests/helpers/db";
@@ -538,49 +533,33 @@ describe("password reset", () => {
  * RBAC — the roadmap's stated acceptance criterion ("wrong-role access returns
  * 403") and the only thing that actually proves the guard works.
  *
- * A throwaway app is mounted here because no real endpoint uses `requireRole`
- * yet. Testing it against a route invented for the test is honest; shipping a
- * dead admin endpoint just to have something to point at would not be.
+ * This ran against a throwaway `/__test/admin-only` app until `/api/admin`
+ * shipped. It now runs against the real router, which is strictly better: the
+ * guard is asserted where it actually protects something, including the case a
+ * hand-mounted route could never cover — a landlord, who passes the listings
+ * gate and must still fail this one.
  */
 describe("requireRole", () => {
-  /**
-   * Standalone, not `guarded.use(app)`.
-   *
-   * Mounting the real app first means its `notFoundHandler` — which is
-   * correctly the last thing in the stack — answers before any route added
-   * afterwards is reached, and every assertion here comes back 404. The guard
-   * under test needs only a cookie parser and the error handler.
-   */
-  const guarded = express();
-  guarded.use(cookieParser());
-  guarded.get(
-    "/__test/admin-only",
-    requireAuth,
-    requireRole("admin"),
-    (_req, res) => {
-      res.json(ok({ secret: true }));
-    },
-  );
-  guarded.use(errorHandler);
-
-  async function accessTokenFor(role: "renter" | "admin") {
-    if (role === "admin") {
-      await createUser({ email: "boss@example.com", role: "admin" });
-      const res = await request(app)
-        .post("/api/auth/login")
-        .send({ email: "boss@example.com", password: TEST_PASSWORD });
+  async function accessTokenFor(role: "renter" | "landlord" | "admin") {
+    if (role === "renter") {
+      const res = await request(app).post("/api/auth/register").send(SIGNUP);
       return readCookie(res.headers["set-cookie"] as unknown as string[], ACCESS_COOKIE);
     }
 
-    const res = await request(app).post("/api/auth/register").send(SIGNUP);
+    const email = `${role}@example.com`;
+    await createUser({ email, role });
+    const res = await request(app)
+      .post("/api/auth/login")
+      .send({ email, password: TEST_PASSWORD });
+
     return readCookie(res.headers["set-cookie"] as unknown as string[], ACCESS_COOKIE);
   }
 
   it("403s a renter on an admin-only route", async () => {
     const token = await accessTokenFor("renter");
 
-    const res = await request(guarded)
-      .get("/__test/admin-only")
+    const res = await request(app)
+      .get("/api/admin/overview")
       .set("Cookie", cookieHeader({ [ACCESS_COOKIE]: token }));
 
     // 403, not 401 — signing in again would not help, and the client renders
@@ -589,16 +568,27 @@ describe("requireRole", () => {
     expect(res.body.error.code).toBe("FORBIDDEN");
   });
 
+  it("403s a landlord, who passes the listings gate but not this one", async () => {
+    const token = await accessTokenFor("landlord");
+
+    const res = await request(app)
+      .get("/api/admin/overview")
+      .set("Cookie", cookieHeader({ [ACCESS_COOKIE]: token }));
+
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe("FORBIDDEN");
+  });
+
   it("401s an anonymous caller on the same route", async () => {
-    const res = await request(guarded).get("/__test/admin-only");
+    const res = await request(app).get("/api/admin/overview");
     expect(res.status).toBe(401);
   });
 
   it("lets an admin through", async () => {
     const token = await accessTokenFor("admin");
 
-    const res = await request(guarded)
-      .get("/__test/admin-only")
+    const res = await request(app)
+      .get("/api/admin/overview")
       .set("Cookie", cookieHeader({ [ACCESS_COOKIE]: token }));
 
     expect(res.status).toBe(200);

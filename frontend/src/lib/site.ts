@@ -47,8 +47,9 @@ export const SIGNUP_LANDLORD = "/signup?role=landlord";
  * routes with it, `/dashboard` redirects with it, and the header links to it.
  * Two copies would drift the moment a fourth role or a real admin area lands.
  *
- * Admin goes to /landlord because managing listings is what an admin does
- * today — `/admin` is in the roadmap and does not exist yet.
+ * An admin goes to /admin, which is the only place that sees every account and
+ * every owner's listings. They can still reach /landlord — that is where the
+ * listing editor lives, and it accepts an admin — but it is not their home.
  *
  * A renter goes to /profile rather than /dashboard, which is still a ComingSoon
  * shell. The profile is where a renter's session genuinely starts: nothing gets
@@ -56,5 +57,7 @@ export const SIGNUP_LANDLORD = "/signup?role=landlord";
  * admire an empty catalog first.
  */
 export function homeFor(role: Role): string {
-  return role === "landlord" || role === "admin" ? "/landlord" : "/profile";
+  if (role === "admin") return "/admin";
+
+  return role === "landlord" ? "/landlord" : "/profile";
 }

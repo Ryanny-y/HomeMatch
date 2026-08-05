@@ -116,6 +116,7 @@ model Listing {
   @@index([rent])
   @@index([propertyType])
   @@index([listingType])
+  @@index([createdAt])
   @@map("listings")
 }
 
