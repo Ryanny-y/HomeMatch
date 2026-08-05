@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useState, type ReactNode } from "react";
 import { Search, X } from "lucide-react";
 import { Input } from "@/components/shadcn/input";
 import { Button } from "@/components/shadcn/button";
@@ -32,6 +32,7 @@ export function TableToolbar({
   searchLabel,
   searchValue,
   facets,
+  action,
   onSearch,
   onFacet,
   onClear,
@@ -39,6 +40,8 @@ export function TableToolbar({
   searchLabel: string;
   searchValue: string;
   facets: Facet[];
+  /** The page's primary action, if it has one. Trails the filters. */
+  action?: ReactNode;
   onSearch: (value: string) => void;
   onFacet: (name: string, value: string) => void;
   onClear: () => void;
@@ -83,13 +86,15 @@ export function TableToolbar({
             aria-hidden
             className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
           />
+          {/* 40px on touch, 36px once there is a pointer. The whole toolbar
+              steps together so the row stays aligned. */}
           <Input
             id={searchId}
             type="search"
             value={draft}
             placeholder={searchLabel}
             onChange={(event) => setDraft(event.target.value)}
-            className="pl-9"
+            className="h-10 pl-9 sm:h-9"
           />
         </div>
       </div>
@@ -103,7 +108,7 @@ export function TableToolbar({
             value={facet.value}
             onValueChange={(value) => onFacet(facet.name, value)}
           >
-            <SelectTrigger id={`facet-${facet.name}`} className="w-40">
+            <SelectTrigger id={`facet-${facet.name}`} className="h-10 w-40 sm:h-9">
               <SelectValue placeholder={facet.label} />
             </SelectTrigger>
             <SelectContent>
@@ -125,6 +130,8 @@ export function TableToolbar({
           Clear
         </Button>
       ) : null}
+
+      {action ? <div className="ms-auto">{action}</div> : null}
     </div>
   );
 }

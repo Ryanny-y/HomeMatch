@@ -36,7 +36,9 @@ export function ActivityChart({
   listingsByDay: DailyCount[];
 }) {
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
+    // `min-w-0` on the children: a grid track is `auto` by default, so a chart
+    // that wants more room widens the track instead of shrinking to fit it.
+    <div className="grid gap-4 [&>*]:min-w-0 lg:grid-cols-2">
       <ActivityPanel
         title="Accounts created"
         description="New signups per day, last 30 days."
@@ -67,10 +69,12 @@ function ActivityPanel({
   const total = data.reduce((sum, day) => sum + day.count, 0);
 
   return (
-    <Card>
+    // `gap-4`: Card's stock 24px between header and body is tuned for a header
+    // with an action in it, not a title and one line of description.
+    <Card className="gap-4 border-0 shadow-card">
       <CardHeader className="gap-1">
         <CardTitle className="text-[0.9375rem]">{title}</CardTitle>
-        <p className="text-[0.8125rem] text-ink-muted">{description}</p>
+        <p className="text-[0.8125rem] leading-snug text-ink-muted">{description}</p>
       </CardHeader>
 
       <CardContent>
@@ -80,7 +84,13 @@ function ActivityPanel({
           </p>
         ) : (
           <>
-            <ChartContainer config={config} className="h-52 w-full">
+            {/*
+             * `aspect-auto` is load-bearing. ChartContainer ships `aspect-video`,
+             * which derives width from height — at `h-52` that demands 369px plus
+             * 48px of card padding, so on a 375px phone the entire page scrolled
+             * sideways. Height governs; width follows the card.
+             */}
+            <ChartContainer config={config} className="aspect-auto h-52 w-full">
               <BarChart data={data} margin={{ left: -20, right: 4, top: 4 }}>
                 <CartesianGrid vertical={false} stroke="var(--color-line)" />
                 <XAxis
@@ -121,7 +131,7 @@ function ActivityPanel({
 
             {/* A bar chart is not readable by a screen reader, and squinting at
                 30 bars is a poor way to read an exact figure either. */}
-            <details className="disclosure mt-3">
+            <details className="disclosure mt-4 border-t border-line pt-3">
               <summary className="cursor-pointer text-[0.8125rem] text-ink-muted hover:text-ink">
                 {total} {total === 1 ? noun : `${noun}s`} in this window — see the days
               </summary>

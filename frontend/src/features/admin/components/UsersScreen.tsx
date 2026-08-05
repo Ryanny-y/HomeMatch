@@ -56,9 +56,11 @@ export function UsersScreen({
           />
         ),
         cell: ({ row }) => (
-          <div className="min-w-0">
-            <p className="truncate font-semibold">{row.original.fullName}</p>
-            <p className="truncate text-[0.8125rem] text-ink-muted">
+          <div className="min-w-0 max-w-80">
+            <p className="truncate font-semibold leading-tight">
+              {row.original.fullName}
+            </p>
+            <p className="mt-1 truncate text-[0.8125rem] leading-tight text-ink-muted">
               {row.original.email}
             </p>
           </div>
@@ -77,7 +79,20 @@ export function UsersScreen({
           />
         ),
         cell: ({ row }) => (
-          <Badge variant={row.original.role === "admin" ? "default" : "secondary"}>
+          <Badge
+            variant="secondary"
+            /**
+             * Admin is tinted with the brand, not filled with it: a filled
+             * `--primary` badge reads as a button, and the action colour is
+             * spent on actions. The tint flags the one row whose actions are
+             * refused, which is closer to a state than to an identity.
+             */
+            className={
+              row.original.role === "admin"
+                ? "border-transparent bg-brand-soft text-brand-dark"
+                : "border-transparent bg-surface-sunken text-ink-soft"
+            }
+          >
             {ROLE_LABEL[row.original.role]}
           </Badge>
         ),

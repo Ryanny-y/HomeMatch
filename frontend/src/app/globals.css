@@ -183,7 +183,9 @@
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: var(--color-brand-soft);
   --sidebar-accent-foreground: var(--color-brand-dark);
-  --sidebar-border: var(--color-line);
+  /* Softer than `--color-line`: the rail divides two white surfaces, so a full
+     hairline reads as a seam. `color-mix` keeps the hex defined once. */
+  --sidebar-border: color-mix(in srgb, var(--color-line) 55%, transparent);
   --sidebar-ring: var(--color-brand);
 
   /* The two series on the overview chart. Brand for people, neutral ink for

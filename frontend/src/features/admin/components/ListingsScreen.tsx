@@ -1,10 +1,13 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
+import Link from "next/link";
+import { Plus } from "lucide-react";
 import type { AdminListingDto, AdminListingQuery } from "@homematch/shared";
 import type { ColumnDef } from "@tanstack/react-table";
 import { Alert } from "@/components/ui/Alert";
 import { Badge } from "@/components/shadcn/badge";
+import { Button } from "@/components/shadcn/button";
 import { DataTable, SortButton } from "@/features/admin/components/DataTable";
 import { TablePagination } from "@/features/admin/components/TablePagination";
 import { TableToolbar } from "@/features/admin/components/TableToolbar";
@@ -18,10 +21,20 @@ import {
   STATUS_OPTIONS,
 } from "@/features/admin/content";
 
-const STATUS_VARIANT = {
-  published: "default",
-  draft: "secondary",
-  archived: "outline",
+/**
+ * Status wears the colour contract, not shadcn's variants.
+ *
+ * `variant="default"` paints `--primary`, which in this product means *action* —
+ * buttons, links, focus. A live listing rendered in the action colour reads as
+ * something to click. `live` is the role that already means "renters can see
+ * this", so publication state uses it and nothing else does.
+ */
+const STATUS_BADGE = {
+  published: "border-transparent bg-live-soft text-live-ink",
+  draft: "border-transparent bg-surface-sunken text-ink-muted",
+  // `ink-faint` here was 2.4:1 against the tint — recessive to the point of
+  // unreadable. Archived should be quiet, not illegible.
+  archived: "border-transparent bg-surface-sunken/60 text-ink-muted",
 } as const;
 
 export function ListingsScreen({ query }: { query: AdminListingQuery }) {
@@ -58,8 +71,8 @@ export function ListingsScreen({ query }: { query: AdminListingQuery }) {
         ),
         cell: ({ row }) => (
           <div className="min-w-0 max-w-72">
-            <p className="truncate font-semibold">{row.original.title}</p>
-            <p className="truncate text-[0.8125rem] text-ink-muted">
+            <p className="truncate font-semibold leading-tight">{row.original.title}</p>
+            <p className="mt-1 truncate text-[0.8125rem] leading-tight text-ink-muted">
               {row.original.barangay ?? row.original.address}
             </p>
           </div>
@@ -69,9 +82,11 @@ export function ListingsScreen({ query }: { query: AdminListingQuery }) {
         id: "owner",
         header: () => "Owner",
         cell: ({ row }) => (
-          <div className="min-w-0 max-w-48">
-            <p className="truncate text-[0.8125rem]">{row.original.owner.fullName}</p>
-            <p className="truncate text-[0.8125rem] text-ink-muted">
+          <div className="min-w-0 max-w-56">
+            <p className="truncate text-[0.8125rem] leading-tight">
+              {row.original.owner.fullName}
+            </p>
+            <p className="mt-1 truncate text-[0.8125rem] leading-tight text-ink-muted">
               {row.original.owner.email}
             </p>
           </div>
@@ -82,7 +97,7 @@ export function ListingsScreen({ query }: { query: AdminListingQuery }) {
         header: () => "Status",
         cell: ({ row }) => (
           <div className="space-y-1">
-            <Badge variant={STATUS_VARIANT[row.original.status]}>
+            <Badge variant="secondary" className={STATUS_BADGE[row.original.status]}>
               {STATUS_LABEL[row.original.status]}
             </Badge>
             {row.original.gaps.length > 0 && row.original.status !== "published" ? (
@@ -179,6 +194,20 @@ export function ListingsScreen({ query }: { query: AdminListingQuery }) {
             options: barangayOptions,
           },
         ]}
+        /**
+         * The page's one filled control, and a real route — the landlord
+         * editor accepts an admin, and seeding the catalog is what this account
+         * exists for. Nothing else here is brand-filled, so this is where the
+         * eye goes.
+         */
+        action={
+          <Button asChild className="h-10 sm:h-9">
+            <Link href="/landlord/listings/new">
+              <Plus aria-hidden />
+              Add a listing
+            </Link>
+          </Button>
+        }
         onSearch={onSearch}
         onFacet={onFacet}
         onClear={() =>

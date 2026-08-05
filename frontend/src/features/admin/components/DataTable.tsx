@@ -72,16 +72,21 @@ export function DataTable<T>({
   });
 
   return (
-    <div className="overflow-x-auto rounded-card border border-line bg-surface shadow-card">
+    <div className="overflow-x-auto rounded-card bg-surface shadow-card">
       <Table aria-label={label} aria-busy={loading || undefined}>
-        <TableHeader>
+        {/* Tinted rather than outlined: with the card's border gone, the header
+            needs to separate from the body without drawing a box around it. */}
+        <TableHeader className="bg-surface-sunken/60">
           {table.getHeaderGroups().map((group) => (
             <TableRow key={group.id} className="hover:bg-transparent">
               {group.headers.map((header) => (
                 <TableHead
                   key={header.id}
                   aria-sort={sortStateOf(header.column.columnDef.meta?.sorted)}
-                  className="whitespace-nowrap"
+                  // Table ships 8px cells, which leaves text all but touching
+                  // the card border. 16px gives the row an edge to sit against.
+                  // `SortButton`'s -mx-2/px-2 lands its label on this same edge.
+                  className="h-11 whitespace-nowrap px-4"
                 >
                   {header.isPlaceholder
                     ? null
@@ -97,16 +102,16 @@ export function DataTable<T>({
             <LoadingRows columns={columns.length} />
           ) : rows.length === 0 ? (
             <TableRow className="hover:bg-transparent">
-              <TableCell colSpan={columns.length} className="h-40 text-center align-middle">
+              <TableCell colSpan={columns.length} className="h-40 px-4 text-center align-middle">
                 <p className="font-semibold">{empty.title}</p>
-                <p className="mt-1 text-[0.8125rem] text-ink-muted">{empty.body}</p>
+                <p className="mt-1.5 text-[0.8125rem] text-ink-muted">{empty.body}</p>
               </TableCell>
             </TableRow>
           ) : (
             table.getRowModel().rows.map((row) => (
               <TableRow key={row.id}>
                 {row.getVisibleCells().map((cell) => (
-                  <TableCell key={cell.id} className="align-middle">
+                  <TableCell key={cell.id} className="px-4 py-3 align-middle">
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </TableCell>
                 ))}
@@ -138,8 +143,10 @@ function LoadingRows({ columns }: { columns: number }) {
       {Array.from({ length: 5 }, (_, row) => (
         <TableRow key={row} aria-hidden className="hover:bg-transparent">
           {Array.from({ length: columns }, (_, column) => (
-            <TableCell key={column}>
-              <Skeleton className="h-5 w-full" />
+            <TableCell key={column} className="px-4 py-3">
+              {/* Skeleton defaults to `bg-accent`, which is the brand tint —
+                  brand means action here, and a placeholder is not one. */}
+              <Skeleton className="h-5 w-full bg-surface-sunken" />
             </TableCell>
           ))}
         </TableRow>
