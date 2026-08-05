@@ -196,8 +196,17 @@ export function apiDelete<T>(path: string): Promise<T> {
   return request<T>(path, { method: "DELETE" });
 }
 
-export function apiGet<T>(path: string): Promise<T> {
-  return request<T>(path, { method: "GET" });
+/**
+ * `headers` exists for Server Components.
+ *
+ * `credentials: "include"` is a browser concept and does nothing on the server,
+ * which has no cookie jar — so a server-side call to an authenticated endpoint
+ * must forward the incoming `cookie` header by hand. `lib/session.ts` has done
+ * this since the first gated page; `forwardedCookies()` there produces the
+ * value. Optional, because in the browser the cookie rides along on its own.
+ */
+export function apiGet<T>(path: string, headers?: HeadersInit): Promise<T> {
+  return request<T>(path, { method: "GET", headers });
 }
 
 /**
@@ -210,8 +219,9 @@ export function apiGet<T>(path: string): Promise<T> {
  */
 export async function apiGetPage<T>(
   path: string,
+  headers?: HeadersInit,
 ): Promise<{ data: T; meta: PaginationMeta }> {
-  const payload = await send<T>(path, { method: "GET" });
+  const payload = await send<T>(path, { method: "GET", headers });
 
   if (!isApiSuccess(payload) || !isPaginated(payload.meta)) {
     throw new ApiError(

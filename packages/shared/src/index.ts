@@ -41,6 +41,10 @@ export {
   createListingSchema,
   updateListingSchema,
   listingIdParamSchema,
+  listingSlugParamSchema,
+  browseQuerySchema,
+  BROWSE_PAGE_SIZE_DEFAULT,
+  BROWSE_PAGE_SIZE_MAX,
   listingImageConfirmSchema,
   listingImagePresignSchema,
 } from "./listing";
@@ -62,6 +66,8 @@ export type {
   ListingImagePresignInput,
   ListingImageDto,
   ListingDto,
+  CatalogListingDto,
+  BrowseQuery,
 } from "./listing";
 
 export {

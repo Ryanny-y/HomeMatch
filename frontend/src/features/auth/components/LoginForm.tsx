@@ -12,9 +12,14 @@ import { login } from "@/features/auth/api/auth.api";
 import { AuthHeading } from "@/features/auth/components/AuthHeading";
 import { useZodForm } from "@/features/auth/hooks/useZodForm";
 import { loginSchema } from "@/features/auth/schemas/auth.schemas";
-import { homeFor } from "@/lib/site";
+import { safeNext } from "@/lib/site";
 
-export function LoginForm() {
+export function LoginForm({
+  /** Where a login wall bounced this visitor from. Untrusted; see `safeNext`. */
+  next,
+}: {
+  next?: string;
+}) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -26,14 +31,16 @@ export function LoginForm() {
       // The session cookie is set by the API; nothing to store client-side.
       // `refresh()` clears cached server-rendered output for the old session.
       //
-      // Routed from the returned role rather than always sending everyone to
-      // /dashboard: that page redirects landlords anyway, and bouncing through
-      // it costs a second navigation on the slow connection this product
-      // assumes. /dashboard stays the safety net for every other entry point.
-      router.push(homeFor(session.user.role));
+      // Back to whatever the login wall interrupted, when there was one.
+      // Otherwise routed from the returned role rather than always sending
+      // everyone to /dashboard: that page redirects landlords anyway, and
+      // bouncing through it costs a second navigation on the slow connection
+      // this product assumes. /dashboard stays the safety net for every other
+      // entry point.
+      router.push(safeNext(next, session.user.role));
       router.refresh();
     },
-    [router],
+    [router, next],
   );
 
   const { errors, formError, pending, formRef, handleSubmit } = useZodForm({

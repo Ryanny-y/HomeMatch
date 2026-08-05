@@ -250,6 +250,42 @@ export const updateListingSchema = z.object({
 
 export const listingIdParamSchema = z.object({ id: z.uuid() });
 
+/**
+ * Slugs are minted by `slugify` in the listings service: lowercase alphanumerics
+ * and hyphens, capped at 60, plus an optional 8-character collision suffix. The
+ * pattern rejects anything else before it reaches a query.
+ */
+export const listingSlugParamSchema = z.object({
+  slug: z
+    .string()
+    .trim()
+    .min(1)
+    .max(80)
+    .regex(/^[a-z0-9-]+$/, "That isn't a listing address."),
+});
+
+/**
+ * Paging for the public catalog.
+ *
+ * Deliberately not the admin package's 20/100. That surface pages a data table
+ * where a row is one line; this one pages a card grid, and 12 divides evenly
+ * into the 2- and 3-column layouts so no page ends on a lone orphan card.
+ */
+export const BROWSE_PAGE_SIZE_DEFAULT = 12;
+export const BROWSE_PAGE_SIZE_MAX = 48;
+
+export const browseQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(BROWSE_PAGE_SIZE_MAX)
+    .default(BROWSE_PAGE_SIZE_DEFAULT),
+});
+
+export type BrowseQuery = z.infer<typeof browseQuerySchema>;
+
 export const listingImageConfirmSchema = z.object({
   storageKey: z.string().trim().min(1),
   isPrimary: z.boolean().optional(),
@@ -317,4 +353,26 @@ export type ListingDto = {
 
   createdAt: string;
   updatedAt: string;
+};
+
+/**
+ * A listing as someone who does not own it may see it.
+ *
+ * The catalog requires an account, so this is not "the public shape" — it is
+ * the *non-owner* shape, and the distinction is why the omissions still matter.
+ * A signed-in renter is not the landlord: `ownerId` would hand them a handle on
+ * another user's account, and `gaps` (added by `withReadiness`, never here)
+ * would tell them what that landlord has not finished writing.
+ *
+ * `status` is dropped because it is `published` by construction — every row
+ * that reaches this type came from a query filtered on it, and a field with one
+ * possible value invites a branch that can never be taken.
+ *
+ * `publishedAt` is added, and non-nullable here even though the column is not:
+ * the column is nullable so drafts can have no publish date, but a row in this
+ * shape is published, and making the UI branch on a null that cannot occur
+ * would be inventing an edge case.
+ */
+export type CatalogListingDto = Omit<ListingDto, "ownerId" | "status"> & {
+  publishedAt: string;
 };

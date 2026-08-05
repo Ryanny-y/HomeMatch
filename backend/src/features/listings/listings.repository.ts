@@ -41,6 +41,41 @@ export function deleteListing(id: string): Promise<unknown> {
   return prisma.listing.delete({ where: { id }, select: { id: true } });
 }
 
+// ------------------------------------------------------------ public read ---
+
+/**
+ * The public catalog reads through these three and nothing else.
+ *
+ * `status: "published"` sits in the `where` of every one of them rather than
+ * being filtered after the fact. A draft that never leaves the database cannot
+ * be leaked by a mapper someone forgets to update.
+ */
+const PUBLISHED = { status: "published" } as const satisfies Prisma.ListingWhereInput;
+
+export function findPublishedListings(skip: number, take: number): Promise<ListingRow[]> {
+  return prisma.listing.findMany({
+    where: PUBLISHED,
+    include: LISTING_INCLUDE,
+    // `id` breaks ties. Two listings published in the same second would
+    // otherwise be free to swap places between pages, so a renter paging
+    // through could see one twice and another not at all.
+    orderBy: [{ publishedAt: "desc" }, { id: "asc" }],
+    skip,
+    take,
+  });
+}
+
+export function countPublished(): Promise<number> {
+  return prisma.listing.count({ where: PUBLISHED });
+}
+
+export function findPublishedBySlug(slug: string): Promise<ListingRow | null> {
+  return prisma.listing.findFirst({
+    where: { ...PUBLISHED, slug },
+    include: LISTING_INCLUDE,
+  });
+}
+
 export function slugExists(slug: string): Promise<boolean> {
   return prisma.listing
     .findUnique({ where: { slug }, select: { id: true } })

@@ -1,8 +1,10 @@
 import { randomUUID } from "node:crypto";
 import type {
+  BrowseQuery,
   CreateListingInput,
   ListingDto,
   ListingImageDto,
+  CatalogListingDto,
   ReadinessGap,
   UpdateListingInput,
 } from "@homematch/shared";
@@ -120,6 +122,57 @@ export type ListingWithReadiness = ListingDto & { gaps: ReadinessGap[] };
  */
 export function withReadiness(row: ListingRow): ListingWithReadiness {
   return { ...toDto(row), gaps: gapsFor(row) };
+}
+
+// ----------------------------------------------------------- catalog read ---
+
+/**
+ * The same listing, narrowed to what a non-owner may see.
+ *
+ * The catalog is behind `requireAuth`, so the reader has an account — but an
+ * account is not ownership. A signed-in renter must still not receive
+ * `ownerId`, which is a handle on another user, or `gaps`, which is a list of
+ * what that landlord has not finished writing.
+ *
+ * Built by subtraction from `toDto` rather than as a second field-by-field
+ * mapper: a parallel mapper would keep the private fields out today and quietly
+ * let the next column through, because nothing would fail when one was added.
+ * Here a new column is exposed unless it is named in this destructure, which is
+ * the wrong default — so the two names below are the whole disclosure surface
+ * and are meant to be read as such.
+ */
+function toCatalogDto(row: ListingRow): CatalogListingDto {
+  const { ownerId: _ownerId, status: _status, ...visible } = toDto(row);
+
+  return {
+    ...visible,
+    // Nullable on the model so drafts need no publish date. A row reaching here
+    // came from a `status: "published"` query, so the fallback is unreachable in
+    // practice and exists to keep the DTO's date non-nullable for the UI.
+    publishedAt: (row.publishedAt ?? row.createdAt).toISOString(),
+  };
+}
+
+export async function browsePublished(
+  query: BrowseQuery,
+): Promise<{ listings: CatalogListingDto[]; total: number }> {
+  const [rows, total] = await Promise.all([
+    repo.findPublishedListings((query.page - 1) * query.pageSize, query.pageSize),
+    repo.countPublished(),
+  ]);
+
+  return { listings: rows.map(toCatalogDto), total };
+}
+
+export async function getPublishedBySlug(slug: string): Promise<CatalogListingDto> {
+  const row = await repo.findPublishedBySlug(slug);
+
+  // A draft's slug and a slug that was never minted both answer "no such
+  // listing". Distinguishing them would let anyone enumerate what a landlord is
+  // still working on.
+  if (!row) throw new NotFoundError("That listing doesn't exist.");
+
+  return toCatalogDto(row);
 }
 
 /**
