@@ -28,8 +28,8 @@ against memory.
 |---|---|---|---|
 | 0 | Foundation & walking skeleton | **Partial** | No Dockerfile, nothing deployed, no README |
 | 1 | Auth, RBAC & user profiles | **Partial** | Nothing deployed |
-| 2 | Listings core + media uploads | **Partial** | No public detail page, no seed catalog, photos 403 |
-| 3 | Discovery: search, filter, favorites | **Not started** | — |
+| 2 | Listings core + media uploads | **Partial** | No seed catalog, no CDN, nothing deployed |
+| 3 | Discovery: search, filter, favorites | **Started** | `/browse` and the listing card exist; no filters, sort, favorites or cache |
 | 4 | AI layer: true cost, match score, comparison | **Started** | True cost done; score and comparison not begun |
 | 5 | Landlord dashboard + analytics + audit | **Not started** | — |
 | 6 | AI assistant + hardening | **Started** | Rate limiting and tests done; assistant not begun |
@@ -119,22 +119,22 @@ formally complete regardless of how much of its code exists.
 
 ### Features
 - [x] Listing create/edit form with image upload
-- [ ] Listing detail rendering (photos, all fields, cost fields) — no public page renders one
+- [x] Listing detail rendering (photos, all fields, cost fields) — `/listings/[slug]`, signed-in only
 - [x] Ownership scoping — enforced in the service; another landlord's listing returns 404
 - [ ] Admin bulk/quick-add for seeding
 
 ### Pages
 - [x] `/landlord/listings/new`, `/landlord/listings/:id/edit`
-- [ ] `/listings/:id` — public detail page
+- [x] `/listings/:id` — detail page, built as `/listings/[slug]` and **behind auth** (see divergences)
 - [x] `/landlord` — manage my listings
 - [x] `/admin/listings` — manage all; **seeding is not built**, so the "seed" half of this row
       is still open and tracked by the unticked quick-add above
 
 ### Definition of done
-- [ ] Create a listing with photos → visible on a detail page — creation and upload work; there
-      is no detail page
-- [ ] S3 + CDN working — presigned upload works against MinIO, but the bucket has no
-      public-read policy so **every photo URL returns 403**, and there is no CDN
+- [x] Create a listing with photos → visible on a detail page
+- [ ] S3 + CDN working — presigned upload works against MinIO and the anonymous-read policy
+      is now set by `minio-init` in `docker-compose.yml`, so photos load. **There is still no
+      CDN**, and in production the bucket should stay private behind one
 - [x] Enrichment fields in the schema — as structured columns, with the divergences below
 - [ ] 10+ seed listings loaded — the database holds 6 rows created for testing, not a curated
       catalog
@@ -151,10 +151,10 @@ formally complete regardless of how much of its code exists.
 - [ ] Browse/discovery interaction (buttons/keyboard/swipe)
 
 ### Pages
-- [ ] `/browse` — exists as a `ComingSoon` placeholder only
+- [x] `/browse` — real catalog: server-rendered grid, paging, no filters yet, **behind auth** (see divergences)
 - [ ] `/discover`
 - [ ] `/favorites`
-- [ ] Reusable listing-card component
+- [x] Reusable listing-card component — `features/catalog/components/ListingCard`
 
 ---
 
@@ -356,6 +356,43 @@ SM"), computed rather than typed.
 
 *Why:* `/listings/:id` is reserved for the public detail page, and mixing a landlord's editor
 into the same namespace invites a route collision.
+
+### The catalog requires an account
+`/browse`, `/listings/[slug]` and `/api/catalog` are all behind authentication.
+
+*Why:* a product decision, taken deliberately against the roadmap. `PRODUCT.md:114` lists
+`/browse` inside "the authenticated shell", but the roadmap's Stage 2 PRD says *"As anyone, I
+can view a published listing's detail page"* (`:137`) and calls `/listings/:id` a "public
+detail page" (`:149`). **The two source documents disagree and the roadmap was not updated.**
+
+The gate is authentication, not role — renter, landlord and admin all see the same rows.
+
+Knock-on effects, all deliberate: the catalog is out of `sitemap.xml`, disallowed in
+`robots.txt`, and `noindex` on both pages, because a crawler following those URLs is
+redirected and would index the login form under a listing's name. Pasted listing links no
+longer unfurl a preview for the same reason.
+
+### The detail page keys on slug, not id
+`/listings/[slug]`, not the roadmap's `/listings/:id`.
+
+*Why:* `slug` is already unique and already minted for every listing, and a public URL that
+reads `/listings/kamias-corner-studio` is worth more to a catalog meant to be indexed and
+shared than one carrying a UUID. The id is still the key everywhere behind the API.
+
+### The public catalog is its own router, mounted at `/api/catalog`
+Not additional routes on `/api/listings`.
+
+*Why:* `listings.routes.ts:16` gates that whole router to landlords and admins with a single
+`router.use`. Public routes added there would be public only while they stayed above that
+line, which makes the feature's security depend on where the next route gets pasted. A
+separate router at a separate mount cannot be gated or ungated by accident.
+
+### `/browse` shipped without filters or search
+The catalog pages; it does not filter, sort, or search. Stage 3's filter rows stay unticked.
+
+*Why:* a deliberate call at four published listings, where every facet returns either
+everything or nothing. The filter API is Stage 3 work and lands when the catalog is large
+enough to exercise it.
 
 ### `walkabilityNote` is a column no form writes
 Still in the schema and in `updateListingSchema`, but no UI sets it. Left deliberately rather
