@@ -8,6 +8,7 @@ import { Wordmark } from "@/components/ui/Logo";
 import type { AuthenticatedUser } from "@homematch/shared";
 import { PRIMARY_NAV } from "@/lib/site";
 import { SessionActions } from "@/components/SessionActions";
+import { useLeaveGuard } from "@/providers/UnsavedChangesProvider";
 
 /**
  * Sticky site header.
@@ -20,6 +21,18 @@ import { SessionActions } from "@/components/SessionActions";
 export function SiteHeader({ user }: { user: AuthenticatedUser | null }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const requestLeave = useLeaveGuard();
+
+  /**
+   * Next 16's `onNavigate` can cancel a soft navigation, which is the only hook
+   * a form with unsaved work has on these links — `beforeunload` does not fire
+   * for an in-app route change. `preventDefault` is synchronous and the
+   * confirmation is not, so the navigation is always cancelled here and
+   * resumed by the provider if the reader confirms.
+   */
+  const guard = (href: string) => (event: { preventDefault: () => void }) => {
+    if (!requestLeave(href)) event.preventDefault();
+  };
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8);
@@ -64,6 +77,7 @@ export function SiteHeader({ user }: { user: AuthenticatedUser | null }) {
                 <li key={link.href}>
                   <Link
                     href={link.href}
+                    onNavigate={guard(link.href)}
                     className="rounded-chip px-3 py-2 text-[0.9375rem] font-medium text-ink-muted transition-colors hover:bg-brand-soft hover:text-brand-dark"
                   >
                     {link.label}
@@ -104,6 +118,7 @@ export function SiteHeader({ user }: { user: AuthenticatedUser | null }) {
                   <li key={link.href}>
                     <Link
                       href={link.href}
+                      onNavigate={guard(link.href)}
                       onClick={() => setMenuOpen(false)}
                       className="block py-3 font-medium text-ink-soft transition-colors hover:text-brand-dark"
                     >

@@ -6,6 +6,7 @@ import { useState } from "react";
 import type { AuthenticatedUser } from "@homematch/shared";
 import { logout } from "@/features/auth/api/auth.api";
 import { Button, ButtonLink } from "@/components/ui/Button";
+import { useLeaveGuard } from "@/providers/UnsavedChangesProvider";
 import { homeFor, SIGNUP_RENTER } from "@/lib/site";
 
 /**
@@ -27,6 +28,7 @@ export function SessionActions({
 }) {
   const router = useRouter();
   const [leaving, setLeaving] = useState(false);
+  const requestLeave = useLeaveGuard();
 
   if (!user) {
     return (
@@ -78,6 +80,11 @@ export function SessionActions({
     <div className={stacked ? "mt-4 space-y-3" : "flex items-center gap-3"}>
       <Link
         href={home}
+        // Sign out is left unguarded on purpose: it is a deliberate exit, and
+        // the confirmation would have to unpick a logout as well as a push.
+        onNavigate={(event) => {
+          if (!requestLeave(home)) event.preventDefault();
+        }}
         onClick={onNavigate}
         className={
           stacked
