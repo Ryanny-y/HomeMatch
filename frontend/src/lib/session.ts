@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import type { AuthenticatedUser } from "@homematch/shared";
 
 /**
@@ -37,4 +38,32 @@ export async function currentUser(): Promise<AuthenticatedUser | null> {
     // two are indistinguishable and treating it as signed out is the safe read.
     return null;
   }
+}
+
+/**
+ * The session gate for a page that needs one.
+ *
+ * `next` is where to return after signing in, and is passed by the caller
+ * rather than read from the request because Next gives a Server Component no
+ * reliable handle on its own URL — `/listings/[slug]` only knows its return
+ * path once `params` has been awaited.
+ *
+ * This is convenience, not a security boundary. The API enforces the same rule
+ * on its own (`catalogRouter` sits behind `requireAuth`), which is what actually
+ * protects the data; skipping this call would render an error page, not leak a
+ * catalog.
+ */
+export async function requireUser(next: string): Promise<AuthenticatedUser> {
+  const user = await currentUser();
+
+  if (!user) redirect(`/login?next=${encodeURIComponent(next)}`);
+
+  return user;
+}
+
+/** The cookie header to forward on a server-side API call, or `undefined`. */
+export async function forwardedCookies(): Promise<string | undefined> {
+  const header = (await cookies()).toString();
+
+  return header || undefined;
 }

@@ -2,7 +2,15 @@ import type { MetadataRoute } from "next";
 
 import { SITE } from "@/lib/site";
 
-/** Only pages that are real, public, and worth indexing. */
+/**
+ * Only pages that are real, public, and worth indexing.
+ *
+ * `/browse` and `/listings/[slug]` are deliberately absent. They were listed
+ * here while the catalog was public; behind a login wall a crawler following
+ * either URL is redirected, so listing them would teach search engines to index
+ * the login page under a listing's name. `robots.ts` disallows both for the
+ * same reason.
+ */
 export default function sitemap(): MetadataRoute.Sitemap {
   const lastModified = new Date();
 
