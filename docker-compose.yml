@@ -95,6 +95,17 @@ services:
         done
         mc mb --ignore-existing local/homematch-dev
         mc mb --ignore-existing local/homematch-test
+        # Anonymous GET on objects, which is what makes a listing photo loadable.
+        # The API hands out plain object URLs rather than presigned ones, so
+        # without this every photo on /browse is a 403 — and because a bucket
+        # created before this line keeps its old policy, `mc anonymous set` runs
+        # on every start rather than only at creation.
+        #
+        # `download` grants reads, not writes or listing: uploads still go
+        # through the API's presigned PUT. In production this is the CDN's job
+        # and the bucket itself stays private.
+        mc anonymous set download local/homematch-dev
+        mc anonymous set download local/homematch-test
         echo 'buckets ready'
 
 volumes:
