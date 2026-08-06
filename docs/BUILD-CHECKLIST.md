@@ -144,6 +144,11 @@ formally complete regardless of how much of its code exists.
 
 ## Stage 3 — Discovery: Search, Filter, Favorites, Browse
 
+> The first feature below is in progress and has its own checklist:
+> [[ONBOARDING-AND-FILTERS-CHECKLIST]] (`docs/ONBOARDING-AND-FILTERS-CHECKLIST.md`).
+> It also covers the renter onboarding gate and the location preference the
+> filters open with, neither of which the roadmap lists under this stage.
+
 ### Features
 - [ ] Multi-filter search with pagination + sort
 - [ ] Redis-cached queries (with cache invalidation on listing update)
