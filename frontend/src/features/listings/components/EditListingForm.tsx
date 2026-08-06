@@ -700,7 +700,7 @@ export function EditListingForm({ listing }: { listing: Listing }) {
       <Section
         id="images"
         title="Photos"
-        blurb="Listings without photos get skipped. These save as soon as you add them — the Save bar doesn't cover them."
+        blurb="Listings without photos get skipped. These save as soon as you add them, so the Save bar doesn't apply to this section."
       >
         <PhotoManager listing={listing} />
       </Section>
