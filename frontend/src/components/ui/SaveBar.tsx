@@ -84,13 +84,26 @@ export function SaveBar({
 }
 
 /**
- * `position: sticky` at the bottom of the scroll container rather than `fixed`:
- * a fixed bar sits over whatever is beneath it, and on a phone that is the
- * field being edited. The page reserves the height below it instead.
+ * `position: sticky` at the bottom of the scroll container rather than `fixed`,
+ * so it settles into the flow at the end of the form instead of floating over
+ * it forever.
+ *
+ * **Opaque, deliberately — this used to be `bg-canvas/90 backdrop-blur-md`.**
+ * While pinned, the bar covers the bottom of the viewport: ~70px on a desktop
+ * and ~110px on a phone, where the buttons go full width. Anything scrolled
+ * under it cannot be clicked, and that is unavoidable — a button has to receive
+ * its own clicks, so no amount of `pointer-events` juggling frees the space
+ * behind one.
+ *
+ * Translucency turned that into a trap: the listing editor's "Add photos"
+ * button stayed clearly visible through the blur while silently refusing every
+ * click. Opaque, a covered control simply reads as covered, so the reader
+ * scrolls a little and clicks it. The rule the bar now keeps is the one that
+ * matters — **you never see a control you cannot press.**
  */
 function Bar({ children }: { children: React.ReactNode }) {
   return (
-    <div className="bar-in sticky bottom-0 z-40 -mx-4 mt-8 border-t border-line bg-canvas/90 px-4 py-3.5 backdrop-blur-md sm:-mx-6 sm:px-6">
+    <div className="bar-in sticky bottom-0 z-40 -mx-4 mt-8 border-t border-line bg-canvas px-4 py-3.5 shadow-[0_-4px_16px_rgb(15_23_42/0.06)] sm:-mx-6 sm:px-6">
       <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-between gap-3">
         {children}
       </div>
