@@ -55,10 +55,9 @@ way for everyone.
 - [x] **Phase 1 migration approved** — `preferredCity`, `preferredBarangays`,
       `onboardedAt` on `RenterPreference`. Applied as
       `20260806144748_add_renter_location_preference`, additive only
-- [ ] **`trueMonthlyCost` on `Listing` — recommended, not yet agreed.** Blocks
-      the budget filter in Phase 3; see [Divergences](#divergences) for the
-      argument. Without it the budget filter runs against `rent` and must be
-      *labelled* "rent" in the UI
+- [x] **`trueMonthlyCost` on `Listing` — agreed and built**, ahead of the filter
+      that needs it. Migration `20260806161057_add_listing_true_monthly_cost`,
+      indexed, backfilled. Branch `feat/listing-true-monthly-cost`
 
 ---
 
@@ -160,6 +159,17 @@ schema change, no new feature slice.
 Branch `feat/catalog-filter-api`. Depends on Phase 1 for barangay values to
 filter on.
 
+### Prerequisite — landed early on `feat/listing-true-monthly-cost`
+- [x] `trueMonthlyCost` on `Listing`, indexed, with a hand-written migration that
+      backfills before enforcing NOT NULL — a default would have left every
+      existing row claiming the wrong cost until something touched it
+- [x] Maintained by `listings.service.ts` on create and update, through the same
+      shared `computeTrueMonthlyCost` the cards render with
+- [x] Recomputed on **every** update rather than only when a cost field appears
+      in the patch. One multiplication against the risk of a subtly wrong check
+- [x] Five tests reading the column straight out of Postgres, since the API
+      answers with the rendered figure either way
+
 ### Query contract
 - [ ] `browseQuerySchema` extended — `barangay` (repeatable), `minCost`/`maxCost`,
       `bedrooms`, `propertyType`, `listingType`, `petsAllowed`,
@@ -260,26 +270,41 @@ The four-field profile becomes six. That is a real growth in what a renter is
 asked for, and the mitigation is that onboarding is skippable and every field
 stays optional.
 
-### The budget filter needs a column that does not exist yet
+### `Listing` carries a denormalized true monthly cost
 
-Not yet agreed — see [Open decisions](#open-decisions--these-block-their-phase).
+**Agreed and built.** `trueMonthlyCost Decimal @db.Decimal(12,2)`, indexed,
+maintained by `listings.service.ts` on every create and update.
 
-Every card on `/browse` leads with **true monthly cost**, not rent. That is the
+Every card on `/browse` leads with **true monthly cost**, not rent — the
 product's central claim, stated in `ListingCard`'s own docstring. A budget filter
-that quietly runs against `rent` breaks it in the most visible place available: a
-renter setting ₱25,000 gets a grid of cards reading ₱25,500.
+running against `rent` would break it in the most visible place available. The
+two rows in the dev catalog that carry extra charges show the size of it:
 
-`rent + coalesce(otherFees,0) + coalesce(parkingCost,0)` cannot be expressed in a
-Prisma `where`, and as raw SQL it cannot use an index.
+| Listing | rent | true cost |
+|---|---|---|
+| Teachers Village two-bedroom | ₱24,000 | **₱25,500** |
+| Cubao transient condo | ₱21,000 | **₱28,200** |
 
-*The recommendation:* `trueMonthlyCost Decimal @db.Decimal(12,2)` on `Listing`,
-maintained on write by `listings.service.ts`, which already computes that figure
-through the shared `costOf`. Indexed, filterable, and it cannot disagree with the
-card because both read the same helper. Costs a migration and a one-off backfill.
+A renter asking for ₱25,000 would be handed a card reading ₱25,500.
 
-*If it is declined:* the filter runs against `rent` and the UI must say "rent",
-not "budget" or "monthly cost". Honest, but much less useful — and it leaves the
-renter's own `budget` field, which is in true-cost terms, unable to seed it.
+*Why a column rather than an expression:* `rent + otherFees + parkingCost` cannot
+be written in a Prisma `where`, and as raw SQL it cannot use an index.
+
+*Why it cannot drift:* the service writes it through the same
+`computeTrueMonthlyCost` the cards render with, and that is the only writer.
+`listings.routes.test.ts` asserts the stored figure against the shared function
+rather than against a literal, so the two disagreeing is a test failure.
+
+**Correcting an earlier claim in this file's first draft:** it said the service
+"already computes the figure through the shared `costOf`". It did not. `costOf`
+is a *frontend* helper in `features/catalog/listing-facts.ts`, and the backend
+computed cost nowhere — only the tests and the UI called the shared function. The
+write path had to be added, not reused.
+
+*One thing deliberately not done:* the column is **not** added to `ListingDto`.
+The card computes its own figure from the cost fields it already receives, and
+putting a second copy on the wire would create exactly the two-figures-one-truth
+problem the column exists to close. It is a query column, not a response field.
 
 ---
 

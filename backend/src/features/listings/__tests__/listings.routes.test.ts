@@ -192,6 +192,89 @@ describe("money", () => {
   });
 });
 
+/**
+ * The stored column exists so the catalog can *filter* on the figure the cards
+ * *display*. These read it straight out of Postgres rather than through the
+ * API, because the API answers with the rendered figure either way — which is
+ * exactly the disagreement that would go unnoticed.
+ */
+describe("stored true monthly cost", () => {
+  async function storedCost(id: string): Promise<number> {
+    const row = await prisma.listing.findUniqueOrThrow({
+      where: { id },
+      select: { trueMonthlyCost: true },
+    });
+
+    return Number(row.trueMonthlyCost);
+  }
+
+  it("is the rent on a fresh draft", async () => {
+    const token = await signIn("owner@example.com", "landlord");
+    const id = (await createDraft(token)).body.data.listing.id as string;
+
+    expect(await storedCost(id)).toBe(18000);
+  });
+
+  it("matches what the card computes once fees and parking are added", async () => {
+    const token = await signIn("owner@example.com", "landlord");
+    const cookie = cookieHeader({ [ACCESS_COOKIE]: token });
+    const id = (await createDraft(token)).body.data.listing.id as string;
+
+    const money = { rent: 24000, otherFees: 1200, parkingAvailable: true, parkingCost: 1500 };
+
+    await request(app).patch(`/api/listings/${id}`).set("Cookie", cookie).send(money);
+
+    // Asserted against the shared function rather than the literal 26700, so
+    // this fails if the two ever start disagreeing — which is the whole point
+    // of the column.
+    expect(await storedCost(id)).toBe(totalMonthlyCost(computeTrueMonthlyCost(money)));
+  });
+
+  it("ignores a parking charge while parking is switched off", async () => {
+    const token = await signIn("owner@example.com", "landlord");
+    const cookie = cookieHeader({ [ACCESS_COOKIE]: token });
+    const id = (await createDraft(token)).body.data.listing.id as string;
+
+    await request(app)
+      .patch(`/api/listings/${id}`)
+      .set("Cookie", cookie)
+      .send({ parkingAvailable: false, parkingCost: 1500 });
+
+    // A stale figure left on a unit that does not offer parking must not be
+    // charged for, and the backfill in the migration makes the same exception.
+    expect(await storedCost(id)).toBe(18000);
+  });
+
+  it("recomputes when a cost field is cleared", async () => {
+    const token = await signIn("owner@example.com", "landlord");
+    const cookie = cookieHeader({ [ACCESS_COOKIE]: token });
+    const id = (await createDraft(token)).body.data.listing.id as string;
+
+    await request(app).patch(`/api/listings/${id}`).set("Cookie", cookie).send({ otherFees: 2000 });
+    expect(await storedCost(id)).toBe(20000);
+
+    // `null` clears; it must not be read as "unchanged" the way `undefined` is.
+    await request(app).patch(`/api/listings/${id}`).set("Cookie", cookie).send({ otherFees: null });
+    expect(await storedCost(id)).toBe(18000);
+  });
+
+  it("survives a patch that touches nothing about money", async () => {
+    const token = await signIn("owner@example.com", "landlord");
+    const cookie = cookieHeader({ [ACCESS_COOKIE]: token });
+    const id = (await createDraft(token)).body.data.listing.id as string;
+
+    await request(app).patch(`/api/listings/${id}`).set("Cookie", cookie).send({ otherFees: 2000 });
+    await request(app)
+      .patch(`/api/listings/${id}`)
+      .set("Cookie", cookie)
+      .send({ title: "Renamed, same money" });
+
+    // An unrelated edit recomputes from the stored row, so it must arrive at
+    // the same figure rather than resetting to the bare rent.
+    expect(await storedCost(id)).toBe(20000);
+  });
+});
+
 describe("amenities scored against renter wants", () => {
   it("defaults to false rather than null, so an unanswered amenity is a real answer", async () => {
     const token = await signIn("owner@example.com", "landlord");
