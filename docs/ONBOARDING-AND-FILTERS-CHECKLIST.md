@@ -52,8 +52,9 @@ way for everyone.
 
 ## Open decisions — these block their phase
 
-- [ ] **Phase 1 migration approved** — `preferredCity`, `preferredBarangays`,
-      `onboardedAt` on `RenterPreference`
+- [x] **Phase 1 migration approved** — `preferredCity`, `preferredBarangays`,
+      `onboardedAt` on `RenterPreference`. Applied as
+      `20260806144748_add_renter_location_preference`, additive only
 - [ ] **`trueMonthlyCost` on `Listing` — recommended, not yet agreed.** Blocks
       the budget filter in Phase 3; see [Divergences](#divergences) for the
       argument. Without it the budget filter runs against `rent` and must be
@@ -67,36 +68,49 @@ Branch `feat/renter-location-preference`. Ships alone: `/profile` gains a
 location card, nothing else changes.
 
 ### Schema
-- [ ] `preferredCity String?` on `RenterPreference`
-- [ ] `preferredBarangays String[]` — native Postgres array, as `wants` already is
-- [ ] `onboardedAt DateTime?` — batched here so Phase 2 needs no migration of its
+- [x] `preferredCity String?` on `RenterPreference`
+- [x] `preferredBarangays String[]` — native Postgres array, as `wants` already is
+- [x] `onboardedAt DateTime?` — batched here so Phase 2 needs no migration of its
       own. Without it, "have they been through onboarding?" is indistinguishable
       from "have they set anything?", and a renter who deliberately skipped gets
       sent back every login
-- [ ] Migration `add_renter_location_preference`
-- [ ] Confirm `RenterPreferenceWrite` picks the columns up with no repository
-      change — it is derived from `Prisma.RenterPreferenceUncheckedCreateInput`
+- [x] Migration `add_renter_location_preference`
+- [x] Confirm `RenterPreferenceWrite` picks the columns up with no repository
+      change — it is derived from `Prisma.RenterPreferenceUncheckedCreateInput`.
+      Confirmed: `profile.repository.ts` is untouched by this phase
 
 ### Contract
-- [ ] `updateRenterPreferenceSchema` accepts both fields, with sanity caps in the
+- [x] `updateRenterPreferenceSchema` accepts both fields, with sanity caps in the
       spirit of `MAX_BUDGET` — bounds that catch a fat finger, not policy
-- [ ] `RenterPreferenceDto` + `EMPTY_RENTER_PREFERENCE` carry both fields and
+      (`MAX_PREFERRED_BARANGAYS`, `MAX_PLACE_NAME_LENGTH`)
+- [x] `RenterPreferenceDto` + `EMPTY_RENTER_PREFERENCE` carry both fields and
       `onboardedAt`
-- [ ] `canScoreListings` left alone — location is a filter, not a ranking input,
+- [x] `canScoreListings` left alone — location is a filter, not a ranking input,
       which is the same line that docstring already draws for `budget`
 
 ### Frontend
-- [ ] `useProfileDraft` handles both fields in the draft, dirty count and
+- [x] `useProfileDraft` handles both fields in the draft, dirty count and
       `prepare()` diffing
-- [ ] `LocationCard` rendered by `ProfileScreen`
-- [ ] Free-text entry with chips for now; the derived picker arrives in Phase 3
+- [x] `LocationCard` rendered by `ProfileScreen`
+- [x] Free-text entry with chips for now; the derived picker arrives in Phase 3
       and needs no data migration, since it stores the same strings
 
 ### Done when
-- [ ] `npm run typecheck` · `npm test -w backend` · `npm run lint -w frontend` ·
-      `npm run build -w frontend`
-- [ ] A city and two barangays save on `/profile`, survive a reload, and produce
-      the right SaveBar dirty count
+- [x] `npm run typecheck` · `npm test -w backend` (199 passed) ·
+      `npm run lint -w frontend` (0 errors) · `npm run build -w frontend`
+- [x] A city and two barangays save on `/profile`, survive a reload, and produce
+      the right SaveBar dirty count (2 — city and areas, counted as two fields)
+
+### Landed beyond the plan
+- [x] **Enter adds an area instead of submitting the form.** `TextField` takes no
+      key handler, so the key is caught on a wrapping element. Without it the
+      obvious keystroke would have saved the page
+- [x] **Areas dedupe case-insensitively**, first spelling kept — "diliman" and
+      "Diliman" are one area to the person typing. Also deduped server-side,
+      since a duplicate is not a mistake the renter can see and a 422 would be
+      unanswerable
+- [x] `focusFirstInvalid` now walks `FIELD_ORDER` rather than a hand-listed
+      array that had already fallen behind
 
 ---
 

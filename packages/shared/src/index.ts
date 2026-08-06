@@ -77,6 +77,8 @@ export {
   MAX_BUDGET,
   MAX_HOUSEHOLD_SIZE,
   MAX_OTHER_NEEDS_LENGTH,
+  MAX_PREFERRED_BARANGAYS,
+  MAX_PLACE_NAME_LENGTH,
   canScoreListings,
 } from "./renter-preference";
 export type {

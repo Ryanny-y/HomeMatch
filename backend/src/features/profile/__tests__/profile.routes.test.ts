@@ -1,5 +1,6 @@
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import request from "supertest";
+import { EMPTY_RENTER_PREFERENCE } from "@homematch/shared";
 import { app } from "../../../app";
 import { ACCESS_COOKIE } from "../../auth/auth.cookies";
 import { closeDatabase, resetDatabase } from "../../../../tests/helpers/db";
@@ -61,13 +62,10 @@ describe("GET /api/profile", () => {
       .set("Cookie", as(await signIn("new@example.com", "renter")));
 
     expect(res.status).toBe(200);
-    expect(res.body.data.preference).toEqual({
-      budget: null,
-      householdSize: null,
-      wants: [],
-      otherNeeds: null,
-      updatedAt: null,
-    });
+    // Against the shared constant rather than a copy of it: the point of this
+    // test is that the endpoint answers with the documented empty profile, and
+    // an inline literal only tests that two lists were edited together.
+    expect(res.body.data.preference).toEqual(EMPTY_RENTER_PREFERENCE);
   });
 });
 
@@ -92,6 +90,56 @@ describe("PATCH /api/profile", () => {
       wants: ["pets", "parking", "near_transit"],
       otherNeeds: "Ground floor if possible, and somewhere near a train.",
     });
+  });
+
+  it("round-trips the preferred areas through Postgres", async () => {
+    const cookie = as(await signIn("areas@example.com", "renter"));
+
+    await request(app)
+      .patch("/api/profile")
+      .set("Cookie", cookie)
+      .send({
+        preferredCity: "Quezon City",
+        preferredBarangays: ["Diliman", "Loyola Heights"],
+      });
+
+    const res = await request(app).get("/api/profile").set("Cookie", cookie);
+
+    // A text[] column, so worth reading back rather than trusting the write:
+    // ordering is what the catalog filter and the chip row both rely on.
+    expect(res.body.data.preference.preferredCity).toBe("Quezon City");
+    expect(res.body.data.preference.preferredBarangays).toEqual(["Diliman", "Loyola Heights"]);
+  });
+
+  it("lets a renter clear every preferred area", async () => {
+    const cookie = as(await signIn("clear-areas@example.com", "renter"));
+
+    await request(app)
+      .patch("/api/profile")
+      .set("Cookie", cookie)
+      .send({ preferredBarangays: ["Diliman"] });
+    await request(app)
+      .patch("/api/profile")
+      .set("Cookie", cookie)
+      .send({ preferredBarangays: [] });
+
+    expect(
+      (await request(app).get("/api/profile").set("Cookie", cookie)).body.data.preference
+        .preferredBarangays,
+    ).toEqual([]);
+  });
+
+  it("rejects more preferred areas than the cap", async () => {
+    const cookie = as(await signIn("too-many@example.com", "renter"));
+
+    const res = await request(app)
+      .patch("/api/profile")
+      .set("Cookie", cookie)
+      .send({
+        preferredBarangays: Array.from({ length: 11 }, (_, index) => `Barangay ${index}`),
+      });
+
+    expect(res.status).toBe(422);
   });
 
   it("leaves untouched fields alone across two partial saves", async () => {

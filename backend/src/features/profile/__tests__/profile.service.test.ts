@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   EMPTY_RENTER_PREFERENCE,
+  MAX_PREFERRED_BARANGAYS,
   canScoreListings,
   updateRenterPreferenceSchema,
 } from "@homematch/shared";
@@ -29,6 +30,9 @@ function row(overrides: Partial<RenterPreferenceRow> = {}): RenterPreferenceRow 
     householdSize: null,
     wants: [],
     otherNeeds: null,
+    preferredCity: null,
+    preferredBarangays: [],
+    onboardedAt: null,
     createdAt: new Date("2026-08-01T00:00:00.000Z"),
     updatedAt: new Date("2026-08-02T00:00:00.000Z"),
     ...overrides,
@@ -62,6 +66,25 @@ describe("getMine", () => {
     findUnique.mockResolvedValue(row({ wants: ["pets", "near_transit"] }));
 
     expect((await service.getMine(ACTOR)).wants).toEqual(["pets", "near_transit"]);
+  });
+
+  it("returns the saved areas in the order they were stored", async () => {
+    findUnique.mockResolvedValue(
+      row({ preferredCity: "Quezon City", preferredBarangays: ["Diliman", "Loyola Heights"] }),
+    );
+
+    const preference = await service.getMine(ACTOR);
+
+    expect(preference.preferredCity).toBe("Quezon City");
+    expect(preference.preferredBarangays).toEqual(["Diliman", "Loyola Heights"]);
+  });
+
+  it("reports onboardedAt as an ISO string, or null when never set", async () => {
+    findUnique.mockResolvedValue(row({ onboardedAt: new Date("2026-08-05T09:30:00.000Z") }));
+    expect((await service.getMine(ACTOR)).onboardedAt).toBe("2026-08-05T09:30:00.000Z");
+
+    findUnique.mockResolvedValue(row());
+    expect((await service.getMine(ACTOR)).onboardedAt).toBeNull();
   });
 });
 
@@ -103,6 +126,39 @@ describe("updateMine", () => {
     expect(upsert.mock.calls[0]?.[0].update).toEqual({ wants: [] });
   });
 
+  it("writes an emptied areas list rather than treating it as absent", async () => {
+    upsert.mockResolvedValue(row());
+
+    // Same reason as wants: clearing every area is a real edit, and skipping it
+    // would leave a stale default filter on the catalog.
+    await service.updateMine({ preferredBarangays: [] }, ACTOR);
+
+    expect(upsert.mock.calls[0]?.[0].update).toEqual({ preferredBarangays: [] });
+  });
+
+  it("stores a repeated area once", async () => {
+    upsert.mockResolvedValue(row());
+
+    await service.updateMine(
+      { preferredBarangays: ["Diliman", "Diliman", "Teachers Village"] },
+      ACTOR,
+    );
+
+    // Deduplicated rather than rejected: a duplicate is not a mistake the
+    // renter can see, so a 422 would be unanswerable.
+    expect(upsert.mock.calls[0]?.[0].update).toEqual({
+      preferredBarangays: ["Diliman", "Teachers Village"],
+    });
+  });
+
+  it("stores an emptied city as null rather than an empty string", async () => {
+    upsert.mockResolvedValue(row());
+
+    await service.updateMine({ preferredCity: "" }, ACTOR);
+
+    expect(upsert.mock.calls[0]?.[0].update).toEqual({ preferredCity: null });
+  });
+
   it("scopes the write to the acting renter", async () => {
     upsert.mockResolvedValue(row());
 
@@ -137,6 +193,39 @@ describe("updateRenterPreferenceSchema", () => {
 
   it("accepts an empty wants list", () => {
     expect(updateRenterPreferenceSchema.safeParse({ wants: [] }).success).toBe(true);
+  });
+
+  it("rejects more preferred areas than the cap", () => {
+    const areas = (count: number): string[] =>
+      Array.from({ length: count }, (_, index) => `Barangay ${index}`);
+
+    expect(
+      updateRenterPreferenceSchema.safeParse({
+        preferredBarangays: areas(MAX_PREFERRED_BARANGAYS),
+      }).success,
+    ).toBe(true);
+    expect(
+      updateRenterPreferenceSchema.safeParse({
+        preferredBarangays: areas(MAX_PREFERRED_BARANGAYS + 1),
+      }).success,
+    ).toBe(false);
+  });
+
+  it("rejects a blank area but accepts an empty list", () => {
+    // An empty list is how a renter clears their areas. A blank string inside
+    // one is a chip that renders as nothing and matches no listing.
+    expect(updateRenterPreferenceSchema.safeParse({ preferredBarangays: [] }).success).toBe(true);
+    expect(updateRenterPreferenceSchema.safeParse({ preferredBarangays: ["  "] }).success).toBe(
+      false,
+    );
+  });
+
+  it("trims the area names it accepts", () => {
+    const parsed = updateRenterPreferenceSchema.safeParse({
+      preferredBarangays: ["  Diliman  "],
+    });
+
+    expect(parsed.success && parsed.data.preferredBarangays).toEqual(["Diliman"]);
   });
 
   it("rejects other needs over 500 characters", () => {

@@ -24,6 +24,9 @@ function toDto(row: RenterPreferenceRow): RenterPreferenceDto {
     householdSize: row.householdSize,
     wants: row.wants,
     otherNeeds: row.otherNeeds,
+    preferredCity: row.preferredCity,
+    preferredBarangays: row.preferredBarangays,
+    onboardedAt: row.onboardedAt?.toISOString() ?? null,
     updatedAt: row.updatedAt.toISOString(),
   };
 }
@@ -47,6 +50,18 @@ function toWrite(input: UpdateRenterPreferenceInput): RenterPreferenceWrite {
     // Text trimmed to nothing is erased text, not an empty string, so the
     // column holds one representation of "nothing here".
     write.otherNeeds = input.otherNeeds === null || input.otherNeeds === "" ? null : input.otherNeeds;
+  }
+
+  if (input.preferredCity !== undefined) {
+    write.preferredCity =
+      input.preferredCity === null || input.preferredCity === "" ? null : input.preferredCity;
+  }
+
+  if (input.preferredBarangays !== undefined) {
+    // Deduplicated here rather than in the schema, so a client that sends the
+    // same area twice gets it stored once instead of a 422 for a mistake the
+    // renter cannot see and did not make.
+    write.preferredBarangays = [...new Set(input.preferredBarangays)];
   }
 
   return write;

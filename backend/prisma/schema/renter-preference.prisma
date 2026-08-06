@@ -25,6 +25,25 @@ model RenterPreference {
 
   otherNeeds String? @db.VarChar(500)
 
+  /// Where the renter will live, structured so it can drive a SQL filter.
+  ///
+  /// This does not replace the location wants inside `otherNeeds` — "near UP
+  /// Diliman" is richer than any list and stays where a later extraction step
+  /// can read it. But prose cannot be a `WHERE` clause, and the catalog filter
+  /// needs one. Two fields, two jobs.
+  ///
+  /// Plural because a renter realistically accepts several areas; a single
+  /// barangay makes the default filter narrow enough that they would just clear
+  /// it. Values are the free-text strings stored on `Listing.barangay`, which is
+  /// why the picker offers only barangays that published listings actually use.
+  preferredCity      String?
+  preferredBarangays String[]
+
+  /// Set when onboarding is completed **or skipped**, which is why it is not
+  /// inferred from the other columns: a renter who deliberately skipped has an
+  /// empty profile, and without this they would be sent back every login.
+  onboardedAt DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
