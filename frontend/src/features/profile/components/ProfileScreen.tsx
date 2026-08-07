@@ -8,8 +8,9 @@ import { Card } from "@/components/ui/Card";
 import { NumberField, TextareaField } from "@/components/ui/Field";
 import { SaveBar } from "@/components/ui/SaveBar";
 import { useProfile, useSaveProfile } from "@/features/profile/hooks/useProfile";
-import { useProfileDraft } from "@/features/profile/hooks/useProfileDraft";
+import { FIELD_ORDER, useProfileDraft } from "@/features/profile/hooks/useProfileDraft";
 import { IdentityCard } from "./IdentityCard";
+import { LocationCard } from "./LocationCard";
 import { RubricGroup } from "./RubricGroup";
 import { RubricRow } from "./RubricRow";
 import { WantsGrid } from "./WantsGrid";
@@ -52,8 +53,19 @@ function ProfileForm({
   const form = useRef<HTMLFormElement>(null);
   const [justSaved, setJustSaved] = useState(false);
   const save = useSaveProfile();
-  const { draft, errors, dirtyCount, set, toggleWant, validateField, prepare, reset, syncTo } =
-    useProfileDraft(preference);
+  const {
+    draft,
+    errors,
+    dirtyCount,
+    set,
+    toggleWant,
+    addBarangay,
+    removeBarangay,
+    validateField,
+    prepare,
+    reset,
+    syncTo,
+  } = useProfileDraft(preference);
 
   useEffect(() => {
     if (!justSaved) return;
@@ -64,9 +76,10 @@ function ProfileForm({
   const invalidCount = Object.values(errors).filter(Boolean).length;
 
   function focusFirstInvalid(): void {
-    const field = (["budget", "householdSize", "otherNeeds"] as const).find(
-      (name) => errors[name],
-    );
+    // `FIELD_ORDER` rather than a list repeated here: it is already in visual
+    // order, so focus lands on the topmost bad field, and a field added to the
+    // draft cannot be left out of this by omission.
+    const field = FIELD_ORDER.find((name) => errors[name]);
     if (!field) return;
 
     form.current
@@ -120,6 +133,24 @@ function ProfileForm({
             </p>
           </Card>
         )}
+
+        <RubricGroup id="group-location" title="Where you'd live">
+          <RubricRow
+            id="consequence-location"
+            consequence="The only line here that filters rather than scores — the catalog opens on these areas, and one click clears them."
+          >
+            <LocationCard
+              city={draft.preferredCity}
+              barangays={draft.preferredBarangays}
+              cityError={errors.preferredCity}
+              barangaysError={errors.preferredBarangays}
+              onCityChange={(value) => set("preferredCity", value)}
+              onCityBlur={() => validateField("preferredCity")}
+              onAdd={addBarangay}
+              onRemove={removeBarangay}
+            />
+          </RubricRow>
+        </RubricGroup>
 
         <RubricGroup id="group-budget" title="Budget">
           <RubricRow

@@ -9,8 +9,14 @@ import { z } from "zod";
  * types. Two copies would drift and the score would start disagreeing with the
  * profile that produced it.
  *
- * Four fields, deliberately. A budget, how many people have to fit, a list of
- * wants, and a box for whatever the list misses.
+ * Six fields. A budget, how many people have to fit, a list of wants, a box for
+ * whatever the list misses, and the areas the renter will live in.
+ *
+ * The location pair is the newest and the odd one out: everything else here is
+ * *scored*, while `preferredCity` and `preferredBarangays` are *filtered* on.
+ * They were added when the catalog gained filters, because the location wants
+ * already collected in `otherNeeds` are prose and prose cannot be a `WHERE`
+ * clause. `otherNeeds` keeps its job unchanged.
  *
  * Layout, copy, and states for the surface these fields drive are specified in
  * `docs/design/profile-surface.md`.
@@ -55,6 +61,18 @@ export const MAX_BUDGET = 1_000_000;
 export const MAX_HOUSEHOLD_SIZE = 12;
 export const MAX_OTHER_NEEDS_LENGTH = 500;
 
+/**
+ * Bounds on the location fields, in the same spirit: wide enough that no
+ * genuine answer hits them.
+ *
+ * The barangay cap is the one with an actual argument behind it. A renter who
+ * marks twenty areas has expressed no preference at all, and the saved set
+ * becomes the default catalog filter — so an unbounded list is a filter that
+ * silently stops filtering, plus a row of chips nobody can read.
+ */
+export const MAX_PREFERRED_BARANGAYS = 10;
+export const MAX_PLACE_NAME_LENGTH = 80;
+
 /** Every field is optional: a partial profile is a first-class state. */
 export const updateRenterPreferenceSchema = z.object({
   budget: z
@@ -80,6 +98,29 @@ export const updateRenterPreferenceSchema = z.object({
     .max(MAX_OTHER_NEEDS_LENGTH, "Keep this under 500 characters.")
     .nullable()
     .optional(),
+
+  preferredCity: z
+    .string()
+    .trim()
+    .max(MAX_PLACE_NAME_LENGTH, "That's too long to be a city name.")
+    .nullable()
+    .optional(),
+
+  /**
+   * `.min(1)` on each entry rather than on the array: an empty list is how a
+   * renter clears their areas, but a blank string inside one is a chip that
+   * renders as nothing and matches no listing.
+   */
+  preferredBarangays: z
+    .array(
+      z
+        .string()
+        .trim()
+        .min(1, "Pick an area or leave it out.")
+        .max(MAX_PLACE_NAME_LENGTH, "That's too long to be a barangay name."),
+    )
+    .max(MAX_PREFERRED_BARANGAYS, "Pick up to 10 areas.")
+    .optional(),
 });
 
 export type UpdateRenterPreferenceInput = z.infer<typeof updateRenterPreferenceSchema>;
@@ -89,6 +130,13 @@ export type RenterPreferenceDto = {
   householdSize: number | null;
   wants: RenterWant[];
   otherNeeds: string | null;
+  preferredCity: string | null;
+  preferredBarangays: string[];
+  /**
+   * When onboarding was finished or skipped, or `null` if the renter has not
+   * been through it. Read by `/onboarding` to decide whether to show itself.
+   */
+  onboardedAt: string | null;
   updatedAt: string | null;
 };
 
@@ -103,6 +151,9 @@ export const EMPTY_RENTER_PREFERENCE: RenterPreferenceDto = {
   householdSize: null,
   wants: [],
   otherNeeds: null,
+  preferredCity: null,
+  preferredBarangays: [],
+  onboardedAt: null,
   updatedAt: null,
 };
 

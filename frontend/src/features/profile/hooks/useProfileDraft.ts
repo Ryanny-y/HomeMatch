@@ -6,7 +6,7 @@ import type {
   RenterWant,
   UpdateRenterPreferenceInput,
 } from "@homematch/shared";
-import { updateRenterPreferenceSchema } from "@homematch/shared";
+import { MAX_PREFERRED_BARANGAYS, updateRenterPreferenceSchema } from "@homematch/shared";
 import { WANTS } from "@/features/profile/content";
 
 /**
@@ -19,15 +19,29 @@ import { WANTS } from "@/features/profile/content";
  * under the cursor.
  */
 
-export const FIELD_ORDER = ["budget", "householdSize", "wants", "otherNeeds"] as const;
+export const FIELD_ORDER = [
+  "preferredCity",
+  "preferredBarangays",
+  "budget",
+  "householdSize",
+  "wants",
+  "otherNeeds",
+] as const;
 
 export type FieldName = (typeof FIELD_ORDER)[number];
+
+/** The fields held as a list, which need comparing by value rather than by `!==`. */
+const LIST_FIELDS = ["wants", "preferredBarangays"] as const;
+
+type ListField = (typeof LIST_FIELDS)[number];
 
 export type Draft = {
   budget: string;
   householdSize: string;
   wants: RenterWant[];
   otherNeeds: string;
+  preferredCity: string;
+  preferredBarangays: string[];
 };
 
 export type FieldErrors = Partial<Record<FieldName, string>>;
@@ -39,6 +53,8 @@ function toDraft(preference: RenterPreferenceDto): Draft {
       preference.householdSize === null ? "" : String(preference.householdSize),
     wants: preference.wants,
     otherNeeds: preference.otherNeeds ?? "",
+    preferredCity: preference.preferredCity ?? "",
+    preferredBarangays: preference.preferredBarangays,
   };
 }
 
@@ -57,14 +73,18 @@ function parseNumber(raw: string): number | null | "invalid" {
   return Number.isFinite(parsed) ? parsed : "invalid";
 }
 
-function sameWants(a: readonly RenterWant[], b: readonly RenterWant[]): boolean {
-  return a.length === b.length && a.every((want, index) => want === b[index]);
+function sameList(a: readonly string[], b: readonly string[]): boolean {
+  return a.length === b.length && a.every((item, index) => item === b[index]);
+}
+
+function isListField(field: FieldName): field is ListField {
+  return (LIST_FIELDS as readonly FieldName[]).includes(field);
 }
 
 function changedFields(draft: Draft, saved: Draft): FieldName[] {
   return FIELD_ORDER.filter((field) =>
-    field === "wants"
-      ? !sameWants(draft.wants, saved.wants)
+    isListField(field)
+      ? !sameList(draft[field], saved[field])
       : draft[field] !== saved[field],
   );
 }
@@ -92,6 +112,8 @@ function validate(draft: Draft): FieldErrors {
     householdSize: householdSize === "invalid" ? undefined : householdSize,
     wants: draft.wants,
     otherNeeds: draft.otherNeeds.trim() === "" ? null : draft.otherNeeds,
+    preferredCity: draft.preferredCity.trim() === "" ? null : draft.preferredCity,
+    preferredBarangays: draft.preferredBarangays,
   });
 
   if (!result.success) {
@@ -118,6 +140,11 @@ function toPayload(draft: Draft, fields: readonly FieldName[]): UpdateRenterPref
       if (value !== "invalid") payload.householdSize = value;
     } else if (field === "wants") {
       payload.wants = draft.wants;
+    } else if (field === "preferredBarangays") {
+      payload.preferredBarangays = draft.preferredBarangays;
+    } else if (field === "preferredCity") {
+      const trimmed = draft.preferredCity.trim();
+      payload.preferredCity = trimmed === "" ? null : trimmed;
     } else {
       const trimmed = draft.otherNeeds.trim();
       payload.otherNeeds = trimmed === "" ? null : trimmed;
@@ -134,6 +161,15 @@ export type ProfileDraft = {
   isDirty: boolean;
   set: <K extends keyof Draft>(field: K, value: Draft[K]) => void;
   toggleWant: (want: RenterWant) => void;
+  /**
+   * Appends an area, ignoring blanks, duplicates and anything past the cap.
+   *
+   * Silently rather than by raising an error: all three are states the control
+   * can *show* — a disabled button at the cap, a chip already on screen — so an
+   * error message would be telling someone what they can already see.
+   */
+  addBarangay: (name: string) => void;
+  removeBarangay: (name: string) => void;
   /** Validates one field, for the blur pass. */
   validateField: (field: FieldName) => void;
   /**
@@ -180,6 +216,35 @@ export function useProfileDraft(preference: RenterPreferenceDto): ProfileDraft {
     });
   }, []);
 
+  const addBarangay = useCallback((name: string) => {
+    const trimmed = name.trim();
+    if (trimmed === "") return;
+
+    setDraft((current) => {
+      // Case-insensitive, because "diliman" and "Diliman" are one area to the
+      // person typing. The first spelling wins so the chip keeps the casing
+      // they saw when they added it.
+      const exists = current.preferredBarangays.some(
+        (area) => area.toLowerCase() === trimmed.toLowerCase(),
+      );
+
+      if (exists || current.preferredBarangays.length >= MAX_PREFERRED_BARANGAYS) {
+        return current;
+      }
+
+      return { ...current, preferredBarangays: [...current.preferredBarangays, trimmed] };
+    });
+
+    setErrors((current) => ({ ...current, preferredBarangays: undefined }));
+  }, []);
+
+  const removeBarangay = useCallback((name: string) => {
+    setDraft((current) => ({
+      ...current,
+      preferredBarangays: current.preferredBarangays.filter((area) => area !== name),
+    }));
+  }, []);
+
   const validateField = useCallback(
     (field: FieldName) => {
       setErrors((existing) => ({ ...existing, [field]: validate(draft)[field] }));
@@ -216,6 +281,8 @@ export function useProfileDraft(preference: RenterPreferenceDto): ProfileDraft {
     isDirty: changed.length > 0,
     set,
     toggleWant,
+    addBarangay,
+    removeBarangay,
     validateField,
     prepare,
     reset,
