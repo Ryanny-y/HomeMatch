@@ -79,6 +79,7 @@ async function createListing(overrides: {
       listingType: "whole_unit",
       address: "12 Esteban Abada St",
       rent: overrides.rent ?? 18000,
+      trueMonthlyCost: overrides.rent ?? 18000,
       status: overrides.status,
       publishedAt: overrides.status === "published" ? (overrides.publishedAt ?? new Date()) : null,
     },

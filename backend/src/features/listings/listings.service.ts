@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type {
   BrowseQuery,
+  CostInput,
   CreateListingInput,
   ListingDto,
   ListingImageDto,
@@ -8,7 +9,11 @@ import type {
   ReadinessGap,
   UpdateListingInput,
 } from "@homematch/shared";
-import { findReadinessGaps } from "@homematch/shared";
+import {
+  computeTrueMonthlyCost,
+  findReadinessGaps,
+  totalMonthlyCost,
+} from "@homematch/shared";
 import type { AuthContext } from "../../shared/middleware/requireAuth";
 import {
   ConflictError,
@@ -38,6 +43,38 @@ function toNumber(value: unknown): number {
 
 function toNullableNumber(value: unknown): number | null {
   return value === null || value === undefined ? null : Number(value);
+}
+
+/**
+ * The stored true-cost figure, from whichever values the row will hold *after*
+ * the write in hand.
+ *
+ * Routed through the same shared `computeTrueMonthlyCost` the cards and the
+ * detail page render with, so the column a renter filters on and the number
+ * they read cannot drift apart. **This is the only place that writes it** —
+ * anything else setting the column directly reintroduces exactly the
+ * disagreement the column exists to prevent.
+ */
+function trueMonthlyCostOf(input: CostInput): number {
+  return totalMonthlyCost(computeTrueMonthlyCost(input));
+}
+
+/**
+ * The cost inputs a patch leaves behind, merged over what is already stored.
+ *
+ * `undefined` and `null` have to be told apart here: the first means the caller
+ * did not mention the field, the second means they cleared it. Collapsing them
+ * would make clearing a parking charge look like leaving it alone.
+ */
+function costAfterUpdate(current: ListingRow, input: UpdateListingInput): CostInput {
+  return {
+    rent: input.rent ?? toNumber(current.rent),
+    otherFees:
+      input.otherFees !== undefined ? input.otherFees : toNullableNumber(current.otherFees),
+    parkingAvailable: input.parkingAvailable ?? current.parkingAvailable,
+    parkingCost:
+      input.parkingCost !== undefined ? input.parkingCost : toNullableNumber(current.parkingCost),
+  };
 }
 
 function toImageDto(image: ListingRow["images"][number]): ListingImageDto {
@@ -233,6 +270,15 @@ export async function create(
     listingType: input.listingType,
     address: input.address,
     rent: input.rent,
+    // A new listing carries no fees and no parking yet, so this is the rent —
+    // but it goes through the same function anyway rather than being assigned
+    // `input.rent`, so the column has exactly one definition.
+    trueMonthlyCost: trueMonthlyCostOf({
+      rent: input.rent,
+      otherFees: null,
+      parkingAvailable: false,
+      parkingCost: null,
+    }),
   });
 
   return withReadiness(row);
@@ -243,14 +289,22 @@ export async function update(
   input: UpdateListingInput,
   actor: AuthContext,
 ): Promise<ListingWithReadiness> {
-  await loadOwned(id, actor);
+  const current = await loadOwned(id, actor);
 
   // A confirmed pin is what every future commute figure is derived from, so the
   // moment coordinates change we record when — a stale geocode is otherwise
   // indistinguishable from a fresh one.
   const geocodedAt = input.lat !== undefined || input.lng !== undefined ? new Date() : undefined;
 
-  return withReadiness(await repo.updateListing(id, { ...input, geocodedAt }));
+  // Recomputed on every update, not only when a cost field appears in the
+  // patch. The saving from checking is one multiplication, and the cost of
+  // getting the check subtly wrong is a stored figure that quietly disagrees
+  // with the one on the card.
+  const trueMonthlyCost = trueMonthlyCostOf(costAfterUpdate(current, input));
+
+  return withReadiness(
+    await repo.updateListing(id, { ...input, geocodedAt, trueMonthlyCost }),
+  );
 }
 
 export async function publish(

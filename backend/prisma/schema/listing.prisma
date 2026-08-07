@@ -99,6 +99,20 @@ model Listing {
   parkingAvailable Boolean  @default(false)
   parkingCost      Decimal? @db.Decimal(12, 2)
 
+  /// What a renter actually pays each month: rent + other fees + parking.
+  ///
+  /// **Denormalized on purpose.** Every card and detail page already leads with
+  /// this figure, computed at render time by `computeTrueMonthlyCost` in the
+  /// shared package — but the catalog has to *filter* on it, and the sum cannot
+  /// be expressed in a Prisma `where` or indexed as an expression. A budget
+  /// filter running against `rent` instead would hand a renter who asked for
+  /// ₱25,000 a card reading ₱25,500, breaking the one claim this product makes.
+  ///
+  /// The service writes it through that same shared function on every create
+  /// and update, so the stored figure and the rendered one cannot disagree.
+  /// Nothing else may write this column.
+  trueMonthlyCost Decimal @db.Decimal(12, 2)
+
   petsAllowed  Boolean       @default(false)
   curfew       String?
   genderPolicy GenderPolicy?
@@ -114,6 +128,7 @@ model Listing {
   @@index([status])
   @@index([barangay])
   @@index([rent])
+  @@index([trueMonthlyCost])
   @@index([propertyType])
   @@index([listingType])
   @@index([createdAt])

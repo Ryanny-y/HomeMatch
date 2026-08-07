@@ -61,6 +61,10 @@ async function createListing(
       listingType: "whole_unit",
       address: "12 Esteban Abada St",
       rent: overrides.rent ?? 18000,
+      // Neither fee column is set here, so true cost is the rent. Written from
+      // the same expression rather than a literal, so a changed default rent
+      // cannot leave the two disagreeing.
+      trueMonthlyCost: overrides.rent ?? 18000,
       barangay: overrides.barangay ?? null,
       description: overrides.description ?? null,
       lat: overrides.lat ?? null,
