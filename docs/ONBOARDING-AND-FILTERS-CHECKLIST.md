@@ -119,38 +119,60 @@ Branch `feat/renter-onboarding-gate`. Depends on Phase 1's `onboardedAt`. No
 schema change, no new feature slice.
 
 ### Routing
-- [ ] `homeFor("renter")` returns `/onboarding`
-- [ ] `/onboarding` decides server-side: `onboardedAt` set → `/browse`; otherwise
+- [x] `homeFor("renter")` returns `/onboarding`
+- [x] `/onboarding` decides server-side: `onboardedAt` set → `/browse`; otherwise
       render; wrong role → `homeFor(role)`, as `/profile` already does
-- [ ] The decision lives on the page, not in `LoginForm` — one server hop for a
+- [x] The decision lives on the page, not in `LoginForm` — one server hop for a
       returning renter, and it also covers a bookmark, a direct URL and a
       refresh-token session resume, none of which touch the login form
-- [ ] `safeNext` untouched: an explicit `?next=` still wins, so a renter bounced
+- [x] `safeNext` untouched: an explicit `?next=` still wins, so a renter bounced
       off `/browse?page=3` still lands there
 
 ### Screen
-- [ ] `OnboardingScreen` in `features/profile/components/`, exported from that
+- [x] `OnboardingScreen` in `features/profile/components/`, exported from that
       feature's `index.ts` — it renders the profile's fields, so it belongs to
       the profile feature. The route only composes it
-- [ ] Reuses `RubricRow`, `WantsGrid`, `LocationCard`, `useProfileDraft`,
+- [x] Reuses `RubricGroup`, `WantsGrid`, `LocationCard`, `useProfileDraft`,
       `useSaveProfile`. **No new inputs, no second schema**
-- [ ] Ordered location → budget → wants; location leads because it is the field
+- [x] Ordered location → budget → wants; location leads because it is the field
       the very next screen consumes
-- [ ] **Save and browse** and **Skip for now**, both stamping `onboardedAt`
-- [ ] Stays in `(shell)` — the header and `UnsavedChangesProvider` still apply. A
+- [x] **Save and browse** and **Skip for now**, both stamping `onboardedAt`
+- [x] Stays in `(shell)` — the header and `UnsavedChangesProvider` still apply. A
       first-run screen with no way out is a trap; focus comes from a single
       centred column, not from removing the header
 
+### The stamp — decided during the build
+- [x] `POST /api/profile/onboarded`, its own operation rather than a side effect
+      of saving. Skipping writes no preferences at all, and folding the stamp
+      into the PATCH would make every profile edit months later read as a fresh
+      onboarding
+- [x] Not part of `updateRenterPreferenceSchema` — the timestamp is the server's
+      to set, and a client that could send it could claim to have onboarded
+      in 1970
+- [x] Idempotent in one statement (`updateMany` with `onboardedAt: null` in the
+      *where*), so a double-submit or a retry cannot move the date
+- [x] `router.replace`, not `push` — leaving onboarding on the history stack
+      means Back walks the renter into a screen that only bounces them forward
+
 ### Docs
-- [ ] `docs/design/profile-surface.md` — `/onboarding` is no longer "Retired"
-      (§47, §303, §599)
-- [ ] `docs/BUILD-CHECKLIST.md:82`, `:102` — same
+- [x] `docs/design/profile-surface.md` — `/onboarding` is no longer "Retired";
+      the decision table, the first-run state row, and §11 all amended in place
+      rather than rewritten
+- [x] `docs/BUILD-CHECKLIST.md` Stage 1 — same
 
 ### Done when
-- [ ] Fresh renter → login lands on `/onboarding`
-- [ ] Save → `/browse`, and the next login goes straight to `/browse`
-- [ ] Skip → `/browse`, and stays skipped on the next login
-- [ ] Landlord and admin logins unaffected
+- [x] Fresh renter → login lands on `/onboarding`
+- [x] Save → `/browse`, and revisiting `/onboarding` forwards. Row verified in
+      Postgres: budget, city, area and the stamp all written
+- [x] Skip → `/browse`, and stays skipped. Row carries **only** the stamp —
+      no preferences invented on a renter's behalf
+- [x] Landlord login still lands on `/landlord`, and a landlord who types
+      `/onboarding` is bounced there
+- [x] `?next=` still wins over the gate: a never-onboarded renter deep-linked to
+      `/browse?page=2` lands there, and is still asked the next time
+- [x] `/profile` still renders for a skipper, with its empty state intact
+- [x] `npm run typecheck` · `npm test -w backend` (210 passed) ·
+      `npm run lint -w frontend` (0 errors) · `npm run build -w frontend`
 
 ---
 

@@ -25,3 +25,21 @@ export function useSaveProfile() {
     },
   });
 }
+
+/**
+ * Closes the first-run gate, for both the save and the skip.
+ *
+ * Separate from `useSaveProfile` because skipping saves nothing — and because
+ * folding the stamp into every PATCH would turn a profile edit six months from
+ * now into a fresh onboarding date.
+ */
+export function useMarkOnboarded() {
+  const client = useQueryClient();
+
+  return useMutation({
+    mutationFn: api.markOnboarded,
+    onSuccess: (preference) => {
+      client.setQueryData(api.profileKeys.mine(), preference);
+    },
+  });
+}

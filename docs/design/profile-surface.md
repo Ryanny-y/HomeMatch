@@ -14,9 +14,14 @@ updated: 2026-08-03
 Layout and wireframe spec for the renter's account and preferences page, plus the schema and
 API that back it.
 
-> **Status: built and working.** Schema, two migrations, `/api/profile`, and 31 backend tests
-> (§8); the page, its components, and the save flow (§3–§7). `/onboarding` now redirects here,
-> and `homeFor("renter")` sends renters here after login.
+> **Status: built and working.** Schema, three migrations, `/api/profile`, and the page, its
+> components, and the save flow (§3–§7).
+>
+> **Amended:** `/onboarding` is no longer a redirect to here — it is a real first-run gate, and
+> `entryFor("renter")` points at it. `homeFor("renter")` still points here, and the two being
+> briefly collapsed into one function is what made this page unreachable for a while; both
+> amendments are in §11. The field set is six, not four: `preferredCity` and
+> `preferredBarangays` were added when the catalog gained filters.
 >
 > This document stays the record of *why* the page is shaped as it is. Where it and the code
 > disagree, the code is what shipped — see §11 for what changed during the build.
@@ -44,10 +49,10 @@ So the page has two jobs, in this order:
 
 | Decision | Answer | Consequence |
 |---|---|---|
-| `/onboarding` | Retired | `/profile` is the only surface. Its empty state does first-run duty; no wizard, no separate stepper. |
+| `/onboarding` | ~~Retired~~ → **a first-run gate** | Reversed. It renders *these* components, so there is still one field set and one schema — but it asks in sequence where `/profile` waits. Still no wizard and no stepper: one screen, one save, skippable. `/profile` remains the permanent edit surface. |
 | Save model | One Save for the whole page | Not the landlord editor's per-field autosave. A sticky save bar appears when dirty. |
 | Account fields | Display-only | No API exists to change name or email. No Edit button is drawn for either. |
-| Field set | Four | Budget, household size, wants, other needs. Nothing else. |
+| Field set | ~~Four~~ → **six** | Budget, household size, wants, other needs, plus `preferredCity` and `preferredBarangays`. The location pair is the odd one out: everything else here is *scored*, that pair is *filtered* on. |
 
 ### What this page deliberately does not ask
 
@@ -300,7 +305,7 @@ is too narrow for a 5-column text block to hold a comfortable measure.
 
 | State | Behavior |
 |---|---|
-| **First run — nothing set** | All four cards render empty. A `Card tone="brand"` sits above them carrying the empty-state copy (§6). This is the retired `/onboarding`'s job, done in place. No wizard, no modal, no redirect. |
+| **First run — nothing set** | All cards render empty, with a `Card tone="brand"` above them carrying the empty-state copy (§6). **This is no longer the only first-run surface** — `/onboarding` now asks the same questions in sequence before a renter ever reaches here. This state remains for someone who skipped it, or who cleared everything later. |
 | **Partial** | Nothing special. Four fields all visible at once need no progress meter — a counter would restate what the reader can already see. |
 | **Clean** | The save bar is **absent**, not present-and-disabled. Nothing is owed, so nothing is shown. |
 | **Dirty** | Save bar slides up (`--dur-move`, `--ease-arrival`), counting changed fields. `Discard` restores server values without a confirm — nothing here is destructive enough to earn a dialog. |
@@ -596,11 +601,34 @@ Against `frontend/CLAUDE.md`'s floor, which is non-negotiable:
 
 ### Resolved during the build
 
-- **`/onboarding`** redirects to `/profile` rather than being deleted, since it has been linked
-  from copy and may be bookmarked.
-- **Entry point:** `homeFor()` in `lib/site.ts` now returns `/profile` for a renter. That is the
-  single definition the login form, the `/dashboard` redirect, and the header all read, so
-  changing it there moved all three at once rather than patching the header alone.
+- ~~**`/onboarding`** redirects to `/profile` rather than being deleted, since it has been linked
+  from copy and may be bookmarked.~~ **Amended — it is a real page again.** See below.
+- **Entry point:** ~~`homeFor()` in `lib/site.ts` is the single definition the login form, the
+  `/dashboard` redirect, and the header all read, so changing it moves all three at once rather
+  than patching the header alone.~~ **Amended twice — see below.** There are now two functions,
+  because that was one definition answering two questions.
+
+### Amended after the build — `/onboarding` un-retired
+
+The original decision was right about the cost it was avoiding: **two surfaces over one set of
+fields, drifting apart.** That cost is not being paid. `/onboarding` renders this page's own
+`RubricGroup`, `WantsGrid` and `LocationCard`, driven by the same `useProfileDraft` and validated
+by the same shared schema. There is one field set and one set of rules.
+
+What it adds is the thing an edit surface structurally cannot do: **it asks.** `/profile` is
+correct as a place to change your mind and wrong as a place to be introduced to the product — it
+waits, and a renter with nothing set has no reason to know why they should fill it in. The empty
+state did first-run duty honestly, but passively.
+
+The half of the original decision that stands, and should keep standing: **no wizard, no
+stepper.** One screen, one save, and a real Skip. `EMPTY_RENTER_PREFERENCE` exists because a
+partial profile is a first-class state; a gate that will not let someone past would contradict it.
+
+**How it decides whether to show itself:** `RenterPreference.onboardedAt`, stamped by
+`POST /api/profile/onboarded` on save *or* skip, idempotently. The check lives on the page rather
+than in `LoginForm`, so it also covers a bookmark, a typed URL, and a session resumed from a
+refresh token — none of which pass through the login form. `?next=` still wins, so a renter
+bounced off a deep link by the login wall lands where they were going.
 
 ---
 
@@ -623,3 +651,35 @@ Where the code diverges from §1–§9, and why.
   still held untrimmed, so anything typed with a trailing space compared unequal forever and the
   page stayed dirty after a successful save. Found by reading the state flow, then reproduced in
   the browser and fixed.
+
+### Amended again — `homeFor` split into `homeFor` + `entryFor`
+
+The single-definition `homeFor()` recorded above was correct while "where does this role's
+session start?" and "where is this person's own area?" had the same answer. Putting a gate in
+front of the first one made them different, and the collapsed definition then broke the second.
+
+**The failure, because it is worth being able to recognise again.** `homeFor("renter")` was
+pointed at `/onboarding` so login would hit the gate. `SessionActions` builds the header's
+account link from the same call, and labels it *"Your profile"*. So for an onboarded renter:
+
+```
+click "Your profile" → /onboarding → onboardedAt is set → redirect → /browse
+```
+
+`homeFor` was the **only** link to `/profile` in the app, so the page became unreachable — while
+`OnboardingScreen` was still promising "you can change any of them later on your profile".
+
+Now:
+
+| Function | Question it answers | Renter |
+|---|---|---|
+| `homeFor(role)` | Where does this role live? | `/profile` |
+| `entryFor(role)` | Where does a session begin? | `/onboarding` |
+
+`entryFor` defers to `homeFor` for every other role rather than restating those routes. The rule
+for callers: **a bounce uses `homeFor`, a session entry uses `entryFor`.** The login form and
+`/dashboard` are entries; the header link and every wrong-role redirect are not.
+
+This regression reached a person rather than CI because there is still no frontend test runner.
+`homeFor`, `entryFor` and `safeNext` are pure functions over a role and a string — the cheapest
+possible tests, and currently untested.

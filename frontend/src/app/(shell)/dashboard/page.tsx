@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 
 import { ComingSoon } from "@/components/ComingSoon";
 import { currentUser } from "@/lib/session";
-import { homeFor } from "@/lib/site";
+import { entryFor } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: "Dashboard",
@@ -20,9 +20,12 @@ export const metadata: Metadata = {
  */
 export default async function DashboardPage() {
   const user = await currentUser();
-  const home = user ? homeFor(user.role) : null;
+  // `entryFor`, not `homeFor`: this is a session entry point, so a renter who
+  // has never onboarded should be asked here too rather than dropped straight
+  // into their profile.
+  const entry = user ? entryFor(user.role) : null;
 
-  if (home && home !== "/dashboard") redirect(home);
+  if (entry && entry !== "/dashboard") redirect(entry);
 
   return (
     <ComingSoon

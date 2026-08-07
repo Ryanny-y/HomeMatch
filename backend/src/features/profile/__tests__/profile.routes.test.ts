@@ -142,6 +142,20 @@ describe("PATCH /api/profile", () => {
     expect(res.status).toBe(422);
   });
 
+  it("does not stamp onboardedAt", async () => {
+    const cookie = as(await signIn("plain-save@example.com", "renter"));
+
+    await request(app).patch("/api/profile").set("Cookie", cookie).send({ budget: 18000 });
+
+    // Saving preferences and getting through the first-run gate are different
+    // events. If a PATCH stamped the date, every profile edit months later
+    // would read as a fresh onboarding.
+    expect(
+      (await request(app).get("/api/profile").set("Cookie", cookie)).body.data.preference
+        .onboardedAt,
+    ).toBeNull();
+  });
+
   it("leaves untouched fields alone across two partial saves", async () => {
     const cookie = as(await signIn("partial@example.com", "renter"));
 
@@ -216,5 +230,60 @@ describe("PATCH /api/profile", () => {
     // The row is keyed by the token's own user id, so there is no id to tamper
     // with — this asserts that stays true.
     expect(res.body.data.preference.householdSize).toBeNull();
+  });
+});
+
+describe("POST /api/profile/onboarded", () => {
+  it("stamps onboardedAt for a renter who has saved nothing", async () => {
+    const cookie = as(await signIn("skipper@example.com", "renter"));
+
+    const res = await request(app).post("/api/profile/onboarded").set("Cookie", cookie);
+
+    // Skipping is a real way through the gate, so it has to work with no row in
+    // the table yet.
+    expect(res.status).toBe(200);
+    expect(res.body.data.preference.onboardedAt).not.toBeNull();
+    expect(res.body.data.preference.budget).toBeNull();
+  });
+
+  it("keeps the first date when called twice", async () => {
+    const cookie = as(await signIn("twice@example.com", "renter"));
+
+    const first = await request(app).post("/api/profile/onboarded").set("Cookie", cookie);
+    const second = await request(app).post("/api/profile/onboarded").set("Cookie", cookie);
+
+    // Idempotent by design: a double-submit, a retry, or a later visit to the
+    // route must not move the date. This is when they first got through, not
+    // when they last touched it.
+    expect(second.body.data.preference.onboardedAt).toBe(
+      first.body.data.preference.onboardedAt,
+    );
+  });
+
+  it("leaves saved preferences untouched", async () => {
+    const cookie = as(await signIn("saved-then@example.com", "renter"));
+
+    await request(app)
+      .patch("/api/profile")
+      .set("Cookie", cookie)
+      .send({ budget: 18000, preferredBarangays: ["Diliman"] });
+
+    const res = await request(app).post("/api/profile/onboarded").set("Cookie", cookie);
+
+    expect(res.body.data.preference.budget).toBe(18000);
+    expect(res.body.data.preference.preferredBarangays).toEqual(["Diliman"]);
+    expect(res.body.data.preference.onboardedAt).not.toBeNull();
+  });
+
+  it("403s a landlord", async () => {
+    const res = await request(app)
+      .post("/api/profile/onboarded")
+      .set("Cookie", as(await signIn("landlord-gate@example.com", "landlord")));
+
+    expect(res.status).toBe(403);
+  });
+
+  it("401s an anonymous caller", async () => {
+    expect((await request(app).post("/api/profile/onboarded")).status).toBe(401);
   });
 });

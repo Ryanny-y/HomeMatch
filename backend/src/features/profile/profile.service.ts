@@ -85,3 +85,17 @@ export async function updateMine(
 ): Promise<RenterPreferenceDto> {
   return toDto(await repo.upsertForUser(actor.userId, toWrite(input)));
 }
+
+/**
+ * Records that the renter has been through the first-run gate.
+ *
+ * Its own operation rather than a side effect of saving, because skipping is a
+ * legitimate way through and writes no preferences at all. Folding it into the
+ * PATCH would also make every later profile edit look like a fresh onboarding.
+ *
+ * Not part of `updateRenterPreferenceSchema`: the timestamp is the server's to
+ * set, and a client that could send it could claim to have onboarded in 1970.
+ */
+export async function markOnboarded(actor: AuthContext): Promise<RenterPreferenceDto> {
+  return toDto(await repo.markOnboarded(actor.userId));
+}
