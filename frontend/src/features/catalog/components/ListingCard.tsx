@@ -52,7 +52,14 @@ export function ListingCard({
   const badge = badgeFor(listing);
 
   return (
-    <article className="flex flex-col gap-3.5 rounded-card bg-surface p-3 shadow-card">
+    /**
+     * `h-full` matters more than it looks. The grid already stretches every
+     * `<li>` to the tallest card in the row, but the card inside was sized by
+     * its own content — so a listing with no beds, baths or parking rendered no
+     * fact row and stopped 54px short of its neighbours, taking its button up
+     * with it. This fills the space the grid had already reserved.
+     */
+    <article className="flex h-full flex-col gap-3.5 rounded-card bg-surface p-3 shadow-card">
       <div className="relative">
         <ListingPhoto
           image={listing.images[0]}
@@ -68,7 +75,7 @@ export function ListingCard({
         ) : null}
       </div>
 
-      <div className="flex flex-col gap-3 px-0.5 pb-0.5">
+      <div className="flex flex-1 flex-col gap-3 px-0.5 pb-0.5">
         <div>
           <p className="flex flex-wrap items-baseline gap-x-1.5">
             <span
@@ -96,7 +103,7 @@ export function ListingCard({
         </div>
 
         {facts.length > 0 ? (
-          <ul className="flex items-center border-y border-line py-2.5">
+          <ul className="flex items-center border-t border-line py-2.5">
             {facts.map((fact, index) => {
               const Icon = FACT_ICON[fact.key];
 
@@ -120,20 +127,32 @@ export function ListingCard({
           </ul>
         ) : null}
 
-        <p className="font-mono text-[0.65625rem] tracking-[0.1em] text-ink-faint uppercase">
-          {listedAgo(listing.publishedAt)}
-        </p>
+        {/*
+         * The foot of the card, pinned by `mt-auto` so the buttons line up
+         * across a row however much a listing had to say. The slack collects
+         * above this block rather than under it — pinning the button alone
+         * would leave "Listed…" stranded in the middle of a sparse card.
+         *
+         * It carries the hairline that used to be the fact row's lower border,
+         * so a listing with no facts still gets one divider instead of ending
+         * in a bare gap.
+         */}
+        <div className="mt-auto border-t border-line pt-3">
+          <p className="font-mono text-[0.65625rem] tracking-[0.1em] text-ink-faint uppercase">
+            {listedAgo(listing.publishedAt)}
+          </p>
 
-        {/* The card is not itself a link. Wrapping this button in one would nest
-            two interactive elements, giving every card two tab stops for one
-            destination and an ambiguous accessible name. */}
-        <Link
-          href={`/listings/${listing.slug}`}
-          className="block rounded-chip bg-brand px-4 py-2.5 text-center text-sm font-bold tracking-[-0.01em] text-white transition-colors duration-(--dur-state) ease-(--ease-state) hover:bg-brand-dark"
-        >
-          View details
-          <span className="sr-only"> for {listing.title}</span>
-        </Link>
+          {/* The card is not itself a link. Wrapping this button in one would
+              nest two interactive elements, giving every card two tab stops for
+              one destination and an ambiguous accessible name. */}
+          <Link
+            href={`/listings/${listing.slug}`}
+            className="mt-3 block rounded-chip bg-brand px-4 py-2.5 text-center text-sm font-bold tracking-[-0.01em] text-white transition-colors duration-(--dur-state) ease-(--ease-state) hover:bg-brand-dark"
+          >
+            View details
+            <span className="sr-only"> for {listing.title}</span>
+          </Link>
+        </div>
       </div>
     </article>
   );
