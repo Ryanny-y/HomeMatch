@@ -79,7 +79,9 @@ formally complete regardless of how much of its code exists.
 
 ### Pages
 - [x] `/signup`, `/login`
-- [x] `/profile` — renter preferences form; `/onboarding` redirects here
+- [x] `/profile` — renter preferences form (six fields; location was added for the catalog filters)
+- [x] `/onboarding` — real first-run gate, reusing `/profile`'s own field components. **Amended:
+      it was retired as a redirect and has been brought back**; see `docs/design/profile-surface.md`
 - [x] `/dashboard` router that sends each role to the right home
 - [x] `/admin` shell (protected) — `/admin`, `/admin/users`, `/admin/listings`, gated in its layout
 - [x] Landlord area shell (protected) — `/landlord`, gated in its layout
@@ -98,10 +100,11 @@ formally complete regardless of how much of its code exists.
 > list at six — a want with nothing to compare against cannot be scored. See the divergence
 > notes below.
 >
-> **The page is built too.** `/profile` renders the four fields with per-field validation on
-> blur and one page-level save; `/onboarding` redirects to it, and `homeFor("renter")` now
-> sends renters there after login instead of to the `/dashboard` shell. Design, copy, and the
-> build's divergences from it are recorded in `docs/design/profile-surface.md`.
+> **The page is built too.** `/profile` renders the fields with per-field validation on blur and
+> one page-level save. `homeFor("renter")` now sends renters to **`/onboarding`**, a first-run
+> gate that renders `/profile`'s own components and forwards to `/browse` once answered or
+> skipped — it was previously a bare redirect to `/profile`, and that reversal is argued in
+> `docs/design/profile-surface.md`, which also records the design and copy.
 >
 > One consequence worth tracking: **`/dashboard` is now unreachable for renters** by normal
 > navigation, so its `ComingSoon` shell is only seen by someone typing the URL. It needs to

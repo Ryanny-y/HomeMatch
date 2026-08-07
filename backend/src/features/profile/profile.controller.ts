@@ -15,3 +15,7 @@ export const updateMine: RequestHandler = async (req, res) => {
   );
   res.status(200).json(ok({ preference }));
 };
+
+export const markOnboarded: RequestHandler = async (req, res) => {
+  res.status(200).json(ok({ preference: await service.markOnboarded(getAuth(req)) }));
+};

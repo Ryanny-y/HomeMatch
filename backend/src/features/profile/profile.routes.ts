@@ -22,3 +22,9 @@ profileRouter.patch(
   validate({ body: updateRenterPreferenceSchema }),
   controller.updateMine,
 );
+
+/**
+ * No body, so no `validate`. The only input is who is calling, and `requireAuth`
+ * above has already answered that.
+ */
+profileRouter.post("/onboarded", controller.markOnboarded);

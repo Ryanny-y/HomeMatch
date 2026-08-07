@@ -49,25 +49,41 @@ export const SIGNUP_RENTER = "/signup?role=renter";
 export const SIGNUP_LANDLORD = "/signup?role=landlord";
 
 /**
- * Where each role belongs after signing in.
- *
- * One definition because three places need the same answer: the login form
- * routes with it, `/dashboard` redirects with it, and the header links to it.
- * Two copies would drift the moment a fourth role or a real admin area lands.
+ * Where each role's own area lives — the page the header links to, and where a
+ * "you don't belong here" bounce sends someone.
  *
  * An admin goes to /admin, which is the only place that sees every account and
  * every owner's listings. They can still reach /landlord — that is where the
  * listing editor lives, and it accepts an admin — but it is not their home.
  *
- * A renter goes to /profile rather than /dashboard, which is still a ComingSoon
- * shell. The profile is where a renter's session genuinely starts: nothing gets
- * scored until it is filled in, so landing them anywhere else asks them to
- * admire an empty catalog first.
+ * **This used to answer a second question as well, and must not again.** It
+ * briefly returned `/onboarding` for a renter so that login would hit the
+ * first-run gate. That is a different question — *where does a session start* —
+ * and collapsing the two made the header's "Your profile" link point at the
+ * gate, which forwards an onboarded renter to /browse. Since this was the only
+ * link to /profile in the app, the page became unreachable.
+ *
+ * Session entry is `entryFor`. **Bounces use this; entry uses that.**
  */
 export function homeFor(role: Role): string {
   if (role === "admin") return "/admin";
 
   return role === "landlord" ? "/landlord" : "/profile";
+}
+
+/**
+ * Where a session begins, which is not always where the role lives.
+ *
+ * A renter starts at /onboarding: a gate rather than a destination, showing the
+ * first-run questions if they have never been answered and forwarding to
+ * /browse otherwise. The indirection is the point — one entry that decides,
+ * rather than every caller having to know whether this renter is new.
+ *
+ * Everyone else starts where they live, so this defers rather than restating
+ * those routes.
+ */
+export function entryFor(role: Role): string {
+  return role === "renter" ? "/onboarding" : homeFor(role);
 }
 
 /**
@@ -78,7 +94,8 @@ export function homeFor(role: Role): string {
  * own login page carrying `?next=https://homematch-ph.example`, which lands a
  * user who has just typed their password on someone else's site, still
  * believing they are here. So the value is not sanitised into shape; anything
- * that is not plainly a path on this site is discarded for the role's home.
+ * that is not plainly a path on this site is discarded for the role's entry
+ * point.
  *
  * Rejected, and why each matters:
  *
@@ -91,10 +108,10 @@ export function homeFor(role: Role): string {
  *   scheme cannot begin with `/`.
  */
 export function safeNext(next: string | undefined, role: Role): string {
-  if (!next) return homeFor(role);
+  if (!next) return entryFor(role);
 
   const isRelativePath =
     next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/\\");
 
-  return isRelativePath ? next : homeFor(role);
+  return isRelativePath ? next : entryFor(role);
 }
